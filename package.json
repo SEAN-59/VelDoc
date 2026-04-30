@@ -1,0 +1,13 @@
+{
+  "name": "veldoc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/assets/js/editor.js && node --check public/assets/js/home.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

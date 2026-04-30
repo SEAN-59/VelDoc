@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f8f8f8" />
+    <title>VelDoc</title>
+    <link rel="icon" type="image/png" href="../assets/images/favicon.ico?v=20260430-1" sizes="32x32" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260430-view-transition-skeleton-2" />
+  </head>
+  <body>
+    <div class="page-loading-overlay" id="pageLoadingOverlay" hidden>
+      <div class="loading-box" role="status" aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span id="pageLoadingText">처리 중...</span>
+      </div>
+    </div>
+    <div class="message-dialog-overlay" id="messageDialog" role="alertdialog" aria-modal="true" aria-labelledby="messageDialogTitle" aria-describedby="messageDialogBody" hidden>
+      <div class="message-dialog-box">
+        <div class="message-dialog-head">
+          <h2 id="messageDialogTitle">파일을 열 수 없음</h2>
+        </div>
+        <p id="messageDialogBody">API 명세서 작성기 양식과 맞지 않는 Markdown 파일입니다.</p>
+        <div class="message-dialog-actions">
+          <button class="button secondary" id="messageDialogCancelButton" type="button" hidden>취소</button>
+          <button class="button primary" id="messageDialogCloseButton" type="button">확인</button>
+        </div>
+      </div>
+    </div>
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+    <button class="menu-backdrop" id="menuBackdrop" type="button" aria-label="메뉴 닫기" hidden></button>
+    <button class="file-panel-backdrop" id="filePanelBackdrop" type="button" aria-label="파일 패널 닫기" hidden></button>
+    <button class="file-panel-rail" id="filePanelRail" type="button" aria-label="파일 패널 열기" aria-controls="sideMenu" aria-expanded="false"></button>
+    <button class="top-button" id="topButton" type="button" aria-label="맨 위로 이동">TOP</button>
+    <main class="app-shell preview-closed" id="appShell">
+      <aside class="side-menu" id="sideMenu" aria-hidden="false">
+        <div class="side-menu-head">
+          <div class="side-menu-actions">
+            <button class="button secondary" id="folderViewerButton" type="button" aria-pressed="false">뷰어</button>
+          </div>
+        </div>
+        <div class="file-tree-root" id="fileTreeRoot">폴더를 선택하세요.</div>
+        <nav class="file-tree" id="fileTree" aria-label="명세서 파일 목록">
+          <p class="file-tree-empty">표시할 파일이 없습니다.</p>
+        </nav>
+        <button
+          class="side-menu-resizer"
+          id="sideMenuResizer"
+          type="button"
+          aria-label="파일 패널 크기 조절"
+          aria-valuemin="176"
+          aria-valuemax="280"
+          aria-valuenow="280"
+        ></button>
+      </aside>
+      <section class="workspace" aria-label="API 명세 작성">
+        <header class="topbar">
+          <div class="brand-block">
+            <button
+              class="brand-mark menu-trigger"
+              id="menuButton"
+              type="button"
+              aria-label="메뉴 열기"
+              aria-controls="floatingMenu"
+              aria-expanded="false"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <div class="brand-copy">
+              <h1 id="workspaceTitle">API 명세서 작성기</h1>
+            </div>
+          </div>
+          <div class="floating-menu" id="floatingMenu" aria-hidden="true" inert>
+            <div class="floating-menu-head">
+              <strong>메뉴</strong>
+            </div>
+            <nav class="page-nav" aria-label="페이지 이동">
+              <button class="active" type="button" data-page="api-spec" aria-current="page">API 명세서</button>
+            </nav>
+          </div>
+          <div class="actions">
+            <button
+              class="button secondary"
+              id="previewToggleButton"
+              type="button"
+              aria-controls="previewPanel"
+              aria-expanded="false"
+            >
+              미리보기
+            </button>
+            <button class="button secondary" id="resetButton" type="button">초기화</button>
+            <button class="button secondary" id="newDocumentButton" type="button">새문서</button>
+            <div class="split-button" id="openSplitButton">
+              <button class="button secondary split-main" id="openButton" type="button">열기</button>
+              <button
+                class="button secondary split-arrow"
+                id="openMenuButton"
+                type="button"
+                aria-label="열기 메뉴"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="openDropdown"
+              >
+                ▾
+              </button>
+              <div class="split-menu" id="openDropdown" role="menu" hidden>
+                <button class="split-menu-item" type="button" role="menuitem" data-open-action="folder">폴더 열기</button>
+                <button class="split-menu-item" type="button" role="menuitem" data-open-action="file">파일 열기</button>
+              </div>
+            </div>
+            <input id="openFileInput" type="file" accept=".md,text/markdown,text/plain" hidden />
+            <div class="split-button" id="saveSplitButton">
+              <button class="button primary split-main" id="saveButton" type="button">저장</button>
+              <button
+                class="button primary split-arrow"
+                id="saveMenuButton"
+                type="button"
+                aria-label="저장 메뉴"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="saveDropdown"
+              >
+                ▾
+              </button>
+              <div class="split-menu" id="saveDropdown" role="menu" hidden>
+                <button class="split-menu-item" id="saveOverwriteButton" type="button" role="menuitem" data-save-action="overwrite">덮어쓰기</button>
+                <button class="split-menu-item" id="saveNewButton" type="button" role="menuitem" data-save-action="new">새 파일 저장</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="viewer-transition-skeleton" id="viewerTransitionSkeleton" data-mode="viewer" aria-hidden="true" hidden>
+          <div class="transition-skeleton-editor">
+            <div class="editor-skeleton-grid">
+              <div class="editor-skeleton-card span-2 compact">
+                <span class="viewer-skeleton viewer-skeleton-title"></span>
+                <span class="viewer-skeleton viewer-skeleton-line"></span>
+              </div>
+              <div class="editor-skeleton-card">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title"></span>
+                  <span class="viewer-skeleton viewer-skeleton-chip"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+                <span class="viewer-skeleton viewer-skeleton-field wide"></span>
+              </div>
+              <div class="editor-skeleton-card">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title short"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+                <span class="viewer-skeleton viewer-skeleton-field wide"></span>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+              </div>
+              <div class="editor-skeleton-card span-2">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title medium"></span>
+                  <span class="viewer-skeleton viewer-skeleton-button"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+                <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+                <span class="viewer-skeleton viewer-skeleton-table-row short"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="transition-skeleton-viewer">
+            <div class="viewer-skeleton-card viewer-head">
+              <div>
+                <span class="viewer-skeleton viewer-skeleton-title"></span>
+                <span class="viewer-skeleton viewer-skeleton-line medium"></span>
+              </div>
+              <span class="viewer-skeleton viewer-skeleton-badge"></span>
+            </div>
+            <div class="viewer-skeleton-card viewer-filters">
+              <span class="viewer-skeleton viewer-skeleton-tab"></span>
+              <span class="viewer-skeleton viewer-skeleton-tab medium"></span>
+              <span class="viewer-skeleton viewer-skeleton-tab short"></span>
+            </div>
+            <div class="viewer-skeleton-card viewer-group">
+              <div class="viewer-skeleton-group-head">
+                <span class="viewer-skeleton viewer-skeleton-title medium"></span>
+                <span class="viewer-skeleton viewer-skeleton-badge short"></span>
+              </div>
+              <div class="viewer-skeleton-endpoint">
+                <span class="viewer-skeleton viewer-skeleton-method"></span>
+                <span class="viewer-skeleton viewer-skeleton-line"></span>
+                <span class="viewer-skeleton viewer-skeleton-line medium"></span>
+                <div class="viewer-skeleton-chip-row">
+                  <span class="viewer-skeleton viewer-skeleton-chip"></span>
+                  <span class="viewer-skeleton viewer-skeleton-chip medium"></span>
+                  <span class="viewer-skeleton viewer-skeleton-chip short"></span>
+                </div>
+              </div>
+              <div class="viewer-skeleton-endpoint">
+                <span class="viewer-skeleton viewer-skeleton-method"></span>
+                <span class="viewer-skeleton viewer-skeleton-line medium"></span>
+                <span class="viewer-skeleton viewer-skeleton-line short"></span>
+                <div class="viewer-skeleton-chip-row">
+                  <span class="viewer-skeleton viewer-skeleton-chip medium"></span>
+                  <span class="viewer-skeleton viewer-skeleton-chip short"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form id="specForm" class="form-grid" autocomplete="off">
+          <section class="panel span-2 file-location-panel">
+            <div class="panel-head">
+              <h2>파일 위치</h2>
+            </div>
+            <div class="field-grid single">
+              <div class="field">
+                <span>파일 위치</span>
+                <div class="location-row">
+                  <p class="computed-text" id="fileLocationPreview" tabindex="-1">파일 위치 미정</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>기본 정보</h2>
+              <span class="badge">Required</span>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span>API 이름</span>
+                <input name="apiName" type="text" placeholder="오늘 근태 조회" />
+              </label>
+              <div class="field">
+                <span>Method</span>
+                <div class="check-row wrap">
+                  <label><input name="method" type="radio" value="GET" /> GET</label>
+                  <label><input name="method" type="radio" value="POST" checked /> POST</label>
+                </div>
+              </div>
+              <div class="field wide">
+                <span>최종 Path</span>
+                <p class="computed-text" id="pathPreview">/api/v1</p>
+              </div>
+              <div class="field wide">
+                <span>파일명</span>
+                <p class="computed-text" id="fileNamePreview">api-v1.md</p>
+              </div>
+              <div class="field wide">
+                <span>Path 구성</span>
+                <div class="path-grid">
+                  <label class="field">
+                    <span>대분류</span>
+                    <input name="pathBase" type="text" value="/api" placeholder="/api" />
+                  </label>
+                  <label class="field">
+                    <span>중분류</span>
+                    <input name="pathVersion" type="text" value="/v1" placeholder="/v1" />
+                  </label>
+                  <label class="field">
+                    <span>스웨거 태그</span>
+                    <input name="pathSwaggerTag" type="text" placeholder="/attendance" />
+                  </label>
+                  <label class="field">
+                    <span>동작</span>
+                    <input name="pathAction" type="text" placeholder="/today/date" />
+                  </label>
+                </div>
+              </div>
+              <div class="field wide">
+                <span>사용처</span>
+                <div class="check-row">
+                  <label><input name="clients" type="checkbox" value="공통" /> 공통</label>
+                  <label><input name="clients" type="checkbox" value="Flutter" /> Flutter</label>
+                  <label><input name="clients" type="checkbox" value="Admin Web" /> Admin Web</label>
+                </div>
+              </div>
+              <label class="field wide">
+                <span>목적</span>
+                <textarea class="limited-textarea" name="purpose" rows="2" placeholder="이 API를 언제, 왜 호출하는지 작성"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>인증 / 권한</h2>
+            </div>
+            <div class="field-grid single">
+              <div class="field">
+                <span>인증 필요 여부</span>
+                <input name="authRequired" type="hidden" value="필요" />
+                <button class="toggle-button form-toggle active" id="authRequiredToggle" type="button" aria-pressed="true">필요</button>
+              </div>
+              <div class="auth-details" id="authDetails">
+                <div class="field">
+                  <span>인증 방식</span>
+                  <div class="check-row wrap">
+                    <label><input name="authScheme" type="radio" value="JWT Bearer" checked /> JWT Bearer</label>
+                    <label><input name="authScheme" type="radio" value="OAuth 2.0" /> OAuth 2.0</label>
+                    <label><input name="authScheme" type="radio" value="API Key" /> API Key</label>
+                  </div>
+                </div>
+                <div class="field">
+                  <span>접근 가능 Role</span>
+                  <div class="check-row wrap">
+                    <label><input name="roles" type="checkbox" value="employee" /> employee</label>
+                    <label><input name="roles" type="checkbox" value="manager" /> manager</label>
+                    <label><input name="roles" type="checkbox" value="admin" /> admin</label>
+                  </div>
+                </div>
+                <label class="field">
+                  <span>권한 규칙</span>
+                  <textarea class="textarea-1-5" name="permissionRules" rows="1" placeholder="일반 사용자는 본인 데이터만 조회 가능"></textarea>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>Headers</h2>
+              <button class="mini-button" data-add-row="headers" type="button">추가</button>
+            </div>
+            <div class="rows" id="headersRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>Path Params</h2>
+              <button class="mini-button" data-add-row="pathParams" type="button">추가</button>
+            </div>
+            <p class="section-hint">예시:/api/v1/notices/{noticeId} 에서 {noticeId}</p>
+            <div class="action-param-table" id="actionPathParamsPanel" hidden>
+              <div class="inline-table-head">
+                <span>실동작부 Path Params</span>
+              </div>
+              <div class="action-param-rows" id="actionPathParamsRows"></div>
+            </div>
+            <div class="field param-path-preview">
+              <span>최종 Path</span>
+              <p class="computed-text" id="paramsPathPreview">/api/v1</p>
+            </div>
+            <div class="rows" id="pathParamsRows"></div>
+          </section>
+
+          <section class="panel span-2" id="queryParamsSection">
+            <div class="panel-head">
+              <h2>Query Params</h2>
+              <button class="mini-button" data-add-row="queryParams" type="button">추가</button>
+            </div>
+            <div class="field param-path-preview">
+              <span>최종 Path</span>
+              <p class="computed-text" id="queryPathPreview">/api/v1</p>
+            </div>
+            <div class="rows" id="queryParamsRows"></div>
+          </section>
+
+          <section class="panel span-2" id="bodySection">
+            <div class="panel-head">
+              <h2>Body</h2>
+              <button class="mini-button" data-add-row="bodyFields" type="button">필드 추가</button>
+            </div>
+            <label class="field">
+              <span>Body JSON 미리보기</span>
+              <textarea class="code-input json-preview-textarea" name="bodyJson" rows="10" spellcheck="false" readonly placeholder="필드를 추가하면 JSON이 자동 생성됩니다."></textarea>
+              <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다. 축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
+            </label>
+            <div class="rows top-gap" id="bodyFieldsRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>Success Response</h2>
+              <div class="panel-head-actions">
+                <button class="mini-button" data-add-row="responseFields" type="button">필드 추가</button>
+                <button class="mini-button" id="addSuccessStatusButton" type="button">상태 추가</button>
+              </div>
+            </div>
+            <div class="success-status-tabs" id="successStatusTabs" role="tablist" aria-label="Success Response 상태 목록"></div>
+            <div class="field-grid">
+              <label class="field">
+                <span>Status</span>
+                <input name="successStatus" type="text" inputmode="numeric" maxlength="3" placeholder="200" />
+                <p class="form-error" id="successStatusError" aria-live="polite" hidden></p>
+              </label>
+              <label class="field wide">
+                <span>Response JSON 미리보기</span>
+                <textarea class="code-input json-preview-textarea success-json-preview-textarea" name="successJson" rows="4" data-min-rows="4" data-max-rows="12" spellcheck="false" readonly placeholder="필드를 추가하면 JSON이 자동 생성됩니다."></textarea>
+                <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다. 축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
+              </label>
+            </div>
+            <div class="rows top-gap" id="responseFieldsRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>Error Response</h2>
+              <button class="mini-button" data-add-row="errors" type="button">추가</button>
+            </div>
+            <div class="rows" id="errorsRows"></div>
+          </section>
+
+          <section class="panel business-panel">
+            <div class="panel-head">
+              <h2>비즈니스 규칙</h2>
+            </div>
+            <label class="field">
+              <span>한 줄에 하나씩 작성</span>
+              <textarea class="textarea-5-20" name="businessRules" rows="5" placeholder="날짜/시간은 KST 기준으로 처리한다.&#10;일반 사용자는 본인 데이터만 조회할 수 있다."></textarea>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>목록 / 페이지네이션</h2>
+            </div>
+            <div class="field-grid single">
+              <label class="field">
+                <span>페이지 방식</span>
+                <input name="paginationType" type="text" placeholder="page/size 또는 cursor/limit" />
+              </label>
+              <label class="field">
+                <span>기본 정렬</span>
+                <input name="defaultSort" type="text" placeholder="createdAt desc" />
+              </label>
+              <label class="field">
+                <span>최대 조회 개수</span>
+                <input name="maxItems" type="text" placeholder="100" />
+              </label>
+              <label class="field">
+                <span>검색 / 필터 조건</span>
+                <textarea class="textarea-3-10" name="filters" rows="3" placeholder="이름, 사번, 부서, 근태 상태"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>프론트엔드 처리 메모</h2>
+            </div>
+            <label class="field">
+              <span>한 줄에 하나씩 작성</span>
+              <textarea class="textarea-5-20" name="frontendNotes" rows="5" placeholder="빈 목록 화면 필요&#10;성공 후 공지 상세 화면으로 이동"></textarea>
+            </label>
+          </section>
+        </form>
+
+        <section class="spec-viewer" id="specViewer" aria-label="API 명세서 뷰어" hidden>
+          <div class="spec-viewer-head">
+            <div>
+              <h2>명세서 뷰어</h2>
+              <p id="specViewerRoot">현재 파일 폴더</p>
+            </div>
+            <span class="badge" id="specViewerCount">0 APIs</span>
+          </div>
+          <div class="spec-filter-stack" id="specViewerFilters" hidden>
+            <div class="viewer-filter-row">
+              <span class="viewer-filter-label">대분류</span>
+              <div class="viewer-tabs" id="specCommonTabs" role="tablist" aria-label="대분류 필터"></div>
+            </div>
+            <div class="viewer-filter-row">
+              <span class="viewer-filter-label">중분류</span>
+              <div class="viewer-tabs" id="specVersionTabs" role="tablist" aria-label="중분류 필터"></div>
+            </div>
+          </div>
+          <div class="spec-viewer-note" id="specViewerNote" hidden></div>
+          <div class="spec-viewer-list" id="specViewerList"></div>
+          <p class="spec-viewer-empty" id="specViewerEmpty" hidden>표시할 API 명세서가 없습니다.</p>
+        </section>
+      </section>
+
+      <aside class="preview-panel" id="previewPanel" aria-label="마크다운 미리보기" aria-hidden="true" inert>
+        <div class="preview-head">
+          <div>
+            <p class="eyebrow">Markdown</p>
+            <h2>미리보기</h2>
+          </div>
+          <div class="preview-actions">
+            <span id="statusText" class="status">자동 저장됨</span>
+            <button class="button secondary compact-button" id="copyButton" type="button">복사</button>
+          </div>
+        </div>
+        <pre id="preview" class="preview"></pre>
+      </aside>
+    </main>
+
+    <script src="../assets/js/editor.js?v=20260430-split-menu"></script>
+  </body>
+</html>

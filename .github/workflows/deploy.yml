@@ -1,0 +1,89 @@
+name: Deploy VelDoc
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/sean-59/veldoc:latest
+  NAS_APP_DIR: ${{ vars.NAS_APP_DIR || '/volume1/docker/veldoc' }}
+  NAS_PORT: ${{ secrets.NAS_PORT || '64' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Prepare SSH
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_SSH_PRIVATE_KEY: ${{ secrets.NAS_SSH_PRIVATE_KEY }}
+        run: |
+          set -eu
+          test -n "$NAS_HOST"
+          test -n "$NAS_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$NAS_SSH_PRIVATE_KEY" > ~/.ssh/veldoc_nas
+          chmod 600 ~/.ssh/veldoc_nas
+          ssh-keyscan -p "$NAS_PORT" "$NAS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload compose file
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_USER: ${{ secrets.NAS_USER }}
+        run: |
+          set -eu
+          test -n "$NAS_USER"
+          ssh -i ~/.ssh/veldoc_nas -p "$NAS_PORT" "$NAS_USER@$NAS_HOST" "mkdir -p '$NAS_APP_DIR/docs'"
+          scp -i ~/.ssh/veldoc_nas -P "$NAS_PORT" docker-compose.yml "$NAS_USER@$NAS_HOST:$NAS_APP_DIR/docker-compose.yml"
+
+      - name: Run on NAS
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_USER: ${{ secrets.NAS_USER }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -eu
+          GHCR_TOKEN_B64="$(printf '%s' "$GHCR_TOKEN" | base64 | tr -d '\n')"
+          ssh -i ~/.ssh/veldoc_nas -p "$NAS_PORT" "$NAS_USER@$NAS_HOST" \
+            "NAS_APP_DIR='$NAS_APP_DIR' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_B64='$GHCR_TOKEN_B64' sh -s" <<'REMOTE'
+          set -eu
+
+          if [ -n "$GHCR_USERNAME" ] && [ -n "$GHCR_TOKEN_B64" ]; then
+            printf '%s' "$GHCR_TOKEN_B64" | base64 -d | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          fi
+
+          cd "$NAS_APP_DIR"
+
+          if docker compose version >/dev/null 2>&1; then
+            COMPOSE="docker compose"
+          elif command -v docker-compose >/dev/null 2>&1; then
+            COMPOSE="docker-compose"
+          else
+            echo "Docker Compose is not installed on NAS."
+            exit 1
+          fi
+
+          $COMPOSE pull
+          $COMPOSE up -d --remove-orphans
+          docker image prune -f
+          REMOTE
