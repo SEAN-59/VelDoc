@@ -1,0 +1,38 @@
+.git
+.github
+.gitignore
+.DS_Store
+
+# Environment and local runtime state
+.env
+.env.*
+logs/
+*.log
+docs/
+
+# Dependencies and build output from host
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.parcel-cache/
+.vite/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+veldoc/
+
+# Local/generated document output
+api_spec_docs/
+
+# Local-only design guideline
+documents/DesignGuideline.html
+
+# Local agent instructions
+AGENTS.md
+CLAUDE.me
+CLAUDE.md
