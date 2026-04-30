@@ -8,7 +8,7 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/sean-59/veldoc
-  NAS_APP_DIR: ${{ vars.NAS_APP_DIR || '/volume1/docker/veldoc' }}
+  NAS_APP_DIR: ${{ vars.NAS_APP_DIR || '/volume1/veldoc' }}
   NAS_PORT: ${{ secrets.NAS_PORT || '64' }}
 
 jobs:
@@ -42,6 +42,17 @@ jobs:
             VERSION_TAG="manual-${GITHUB_SHA::7}"
           fi
           echo "version_tag=$VERSION_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate NAS settings
+        env:
+          NAS_HOST: ${{ secrets.NAS_HOST }}
+          NAS_USER: ${{ secrets.NAS_USER }}
+          NAS_SSH_PRIVATE_KEY: ${{ secrets.NAS_SSH_PRIVATE_KEY }}
+        run: |
+          set -eu
+          test -n "$NAS_HOST" || { echo "NAS_HOST secret is required."; exit 1; }
+          test -n "$NAS_USER" || { echo "NAS_USER secret is required."; exit 1; }
+          test -n "$NAS_SSH_PRIVATE_KEY" || { echo "NAS_SSH_PRIVATE_KEY secret is required."; exit 1; }
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
