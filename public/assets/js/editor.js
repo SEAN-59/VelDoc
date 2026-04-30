@@ -214,6 +214,9 @@ const state = {
   saveDir: '',
   activeTreeFilePath: '',
   currentFile: null,
+  browserDirectoryHandle: null,
+  browserSaveDirectoryHandle: null,
+  fileTreeHandles: new Map(),
   viewerMode: false,
   fileTreeOpened: false,
   sideMenuWidth: SIDE_MENU_DEFAULT_WIDTH,
@@ -790,6 +793,11 @@ const buildFileNameFromPath = () => {
 };
 
 const hasSaveDir = () => Boolean(String(state.saveDir ?? '').trim());
+const isBrowserFileSystemSupported = () =>
+  window.isSecureContext && 'showDirectoryPicker' in window && 'showOpenFilePicker' in window;
+const isBrowserFileSystemFile = (file) => String(file?.origin ?? '').startsWith('browser');
+const isMarkdownFileName = (fileName) => /\.(md|markdown)$/i.test(String(fileName ?? ''));
+const localFileLabel = (...parts) => ['내 컴퓨터', ...parts].filter(Boolean).join('/');
 
 const buildFileLocation = () => {
   if (state.currentFile?.displayPath) return state.currentFile.displayPath;
@@ -1195,6 +1203,37 @@ const parseSuccessResponsesFromMarkdown = (section) => {
   );
 };
 
+const extractJsonBlock = (section) => {
+  const match = /```json\s*([\s\S]*?)```/i.exec(section);
+  return decodeMarkdownCell(match?.[1] ?? '');
+};
+
+const parseViewerSuccessResponsesFromMarkdown = (section) => {
+  const blockPattern = /^###\s+(?:\d+\.\s+)?Status\s+`?([^`\n]+)`?\s*$/gmi;
+  const matches = [...section.matchAll(blockPattern)];
+
+  if (matches.length === 0) {
+    return [
+      {
+        status: blankIfPlaceholder(section.match(/Status:\s*`?([^`\n]+)`?/)?.[1] || '200') || '200',
+        json: extractJsonBlock(section),
+        fields: parseResponseFields(section),
+      },
+    ];
+  }
+
+  return matches.map((match, index) => {
+    const start = match.index + match[0].length;
+    const end = matches[index + 1]?.index ?? section.length;
+    const block = section.slice(start, end).trim();
+    return {
+      status: blankIfPlaceholder(match[1]) || '200',
+      json: extractJsonBlock(block),
+      fields: parseResponseFields(block),
+    };
+  });
+};
+
 const parseBulletLines = (section) =>
   section
     .split('\n')
@@ -1224,6 +1263,20 @@ const parseCsvValues = (value) =>
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+
+const getMarkdownTableValue = (section, key) => parseInfoTable(section)[key] || '';
+
+const splitApiPath = (value) =>
+  blankIfPlaceholder(value)
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+const isEmptySpecGroupValue = (value) => {
+  const text = blankIfPlaceholder(value);
+  return !text || text === 'UNKNOWN';
+};
 
 const startsWithSegments = (segments, prefixSegments) =>
   prefixSegments.length > 0 && prefixSegments.every((segment, index) => segments[index] === segment);
@@ -2247,6 +2300,300 @@ const renderFileTree = (tree = []) => {
   markActiveTreeFile();
 };
 
+const compareBrowserGroupName = (a, b) => {
+  if (a === '/' && b !== '/') return -1;
+  if (a !== '/' && b === '/') return 1;
+  if (a === 'UNKNOWN' && b !== 'UNKNOWN') return 1;
+  if (a !== 'UNKNOWN' && b === 'UNKNOWN') return -1;
+  return a.localeCompare(b, 'ko');
+};
+
+const getGroupedTreeSortName = (node) => (node.type === 'file' ? node.label || node.name : node.name);
+const isGroupedTreeRootFile = (node) => node.type === 'file' && getGroupedTreeSortName(node) === '/';
+
+const getSpecGroupingFromMarkdown = (markdown, fallbackName) => {
+  try {
+    const basicSection = getMarkdownSection(markdown, '기본 정보');
+    const pathValue = getMarkdownTableValue(basicSection, 'Path');
+    if (!pathValue || pathValue.includes('예:')) throw new Error('Invalid spec path');
+
+    const segments = splitApiPath(pathValue);
+    const swaggerTagSegments = splitApiPath(getMarkdownTableValue(basicSection, 'Swagger Tag'));
+    const common = segments[0] || '/';
+    const version = segments[1] || '/';
+    const rawSwaggerTag = segments[2] || swaggerTagSegments[0] || '';
+    const swaggerTag = isEmptySpecGroupValue(rawSwaggerTag) ? '' : rawSwaggerTag;
+    const actionSegments = segments.slice(3);
+
+    return {
+      groups: [common, version, swaggerTag].filter(Boolean),
+      label: actionSegments.length > 0 ? `/${actionSegments.join('/')}` : '/',
+    };
+  } catch {
+    return {
+      groups: ['양식 외', '미정', '미정'],
+      label: fallbackName,
+    };
+  }
+};
+
+const toGroupedFileTree = (files) => {
+  const rootGroups = new Map();
+
+  files.forEach((file) => {
+    let currentGroups = rootGroups;
+    file.groups.forEach((groupName) => {
+      if (!currentGroups.has(groupName)) {
+        currentGroups.set(groupName, {
+          type: 'directory',
+          name: groupName,
+          childrenMap: new Map(),
+        });
+      }
+      currentGroups = currentGroups.get(groupName).childrenMap;
+    });
+
+    currentGroups.set(`__file__${file.path}`, {
+      type: 'file',
+      name: file.name,
+      label: file.label,
+      path: file.path,
+    });
+  });
+
+  const serialize = (groups) =>
+    [...groups.values()]
+      .sort((a, b) => {
+        if (isGroupedTreeRootFile(a) !== isGroupedTreeRootFile(b)) {
+          return isGroupedTreeRootFile(a) ? -1 : 1;
+        }
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        const sortResult = compareBrowserGroupName(getGroupedTreeSortName(a), getGroupedTreeSortName(b));
+        return sortResult || a.name.localeCompare(b.name, 'ko');
+      })
+      .map((node) => {
+        if (node.type === 'file') return node;
+        return {
+          type: 'directory',
+          name: node.name,
+          children: serialize(node.childrenMap),
+        };
+      });
+
+  return serialize(rootGroups);
+};
+
+const browserFileExists = async (directoryHandle, fileName) => {
+  try {
+    await directoryHandle.getFileHandle(fileName, { create: false });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const ensureBrowserWritePermission = async (handle) => {
+  if (!handle?.queryPermission || !handle?.requestPermission) return true;
+  const options = { mode: 'readwrite' };
+  if ((await handle.queryPermission(options)) === 'granted') return true;
+  return (await handle.requestPermission(options)) === 'granted';
+};
+
+const writeBrowserFile = async (fileHandle, markdown) => {
+  if (!(await ensureBrowserWritePermission(fileHandle))) {
+    throw new Error('FILE_PERMISSION_DENIED');
+  }
+  const writable = await fileHandle.createWritable();
+  await writable.write(markdown);
+  await writable.close();
+};
+
+const collectBrowserMarkdownFiles = async (
+  directoryHandle,
+  options = {},
+  relativeDir = '',
+  depth = 0,
+  counter = { count: 0 },
+) => {
+  const { rootName = directoryHandle.name, handles = new Map() } = options;
+  if (depth > 8 || counter.count >= 1500) return [];
+
+  const entries = [];
+  for await (const [name, handle] of directoryHandle.entries()) {
+    if (name.startsWith('.')) continue;
+    entries.push([name, handle]);
+  }
+
+  entries.sort(([nameA, handleA], [nameB, handleB]) => {
+    if (handleA.kind !== handleB.kind) return handleA.kind === 'directory' ? -1 : 1;
+    return nameA.localeCompare(nameB, 'ko');
+  });
+
+  const files = [];
+  for (const [name, handle] of entries) {
+    if (counter.count >= 1500) break;
+    const entryRelativePath = relativeDir ? `${relativeDir}/${name}` : name;
+
+    if (handle.kind === 'directory') {
+      files.push(...(await collectBrowserMarkdownFiles(
+        handle,
+        { rootName, handles },
+        entryRelativePath,
+        depth + 1,
+        counter,
+      )));
+      continue;
+    }
+
+    if (handle.kind !== 'file' || !isMarkdownFileName(name)) continue;
+
+    counter.count += 1;
+    const file = await handle.getFile();
+    const markdown = await file.text();
+    const directoryLabel = relativeDir
+      ? localFileLabel(rootName, relativeDir)
+      : localFileLabel(rootName);
+    handles.set(entryRelativePath, {
+      fileHandle: handle,
+      directoryHandle,
+      saveDir: directoryLabel,
+      displayPath: localFileLabel(rootName, entryRelativePath),
+    });
+    files.push({
+      type: 'file',
+      name,
+      path: entryRelativePath,
+      markdown,
+      ...getSpecGroupingFromMarkdown(markdown, name),
+    });
+  }
+
+  return files;
+};
+
+const readBrowserFileTree = async (directoryHandle) => {
+  const handles = new Map();
+  const files = await collectBrowserMarkdownFiles(directoryHandle, { rootName: directoryHandle.name, handles });
+  return {
+    tree: toGroupedFileTree(files),
+    handles,
+  };
+};
+
+const getBrowserSpecSummary = (markdown, fileName, relativePath) => {
+  const title = decodeMarkdownCell(markdown.match(/^#\s+(.+)$/m)?.[1] ?? '');
+  const basicSection = getMarkdownSection(markdown, '기본 정보');
+  const authSection = getMarkdownSection(markdown, '인증 / 권한');
+  const bodySectionText = getMarkdownSection(markdown, 'Body');
+  const successSection = getMarkdownSection(markdown, 'Success Response');
+  const successResponses = parseViewerSuccessResponsesFromMarkdown(successSection);
+  const primarySuccessResponse = successResponses[0] || { status: '200', json: '', fields: [] };
+  const pathValue = getMarkdownTableValue(basicSection, 'Path');
+
+  if (!pathValue || pathValue.includes('예:')) {
+    throw new Error('Invalid spec path');
+  }
+
+  const segments = splitApiPath(pathValue);
+  const rawSwaggerTag = segments[2] || getMarkdownTableValue(basicSection, 'Swagger Tag');
+  const swaggerTag = isEmptySpecGroupValue(rawSwaggerTag) ? '/' : rawSwaggerTag;
+  const method = getMarkdownTableValue(basicSection, 'Method').toUpperCase();
+  const normalizedMethod = ['GET', 'POST'].includes(method) ? method : 'POST';
+
+  return {
+    fileName,
+    relativePath,
+    name: getMarkdownTableValue(basicSection, 'API 이름') || title || fileName,
+    method: normalizedMethod,
+    path: pathValue,
+    commonPath: segments[0] || '/',
+    versionPath: segments[1] || '/',
+    clients: getMarkdownTableValue(basicSection, '사용처') || '미정',
+    purpose: getMarkdownTableValue(basicSection, '목적') || '미정',
+    swaggerTag,
+    authRequired: getMarkdownTableValue(authSection, '인증 필요 여부') || '미정',
+    authScheme: getMarkdownTableValue(authSection, '인증 방식') || '미정',
+    roles: getMarkdownTableValue(authSection, '접근 가능 Role') || '미정',
+    permissionRules: getMarkdownTableValue(authSection, '권한 규칙') || '미정',
+    successStatus: primarySuccessResponse.status,
+    successResponses,
+    headers: parseRowsByHeaders(getMarkdownSection(markdown, 'Headers'), [
+      ['key', 'Key'],
+      ['value', 'Value 예시'],
+      ['required', '필수'],
+      ['description', '설명'],
+    ]),
+    pathParams: parseRowsByHeaders(getMarkdownSection(markdown, 'Path Params'), [
+      ['key', 'Key'],
+      ['type', 'Type'],
+      ['required', '필수'],
+      ['beforeAction', '실동작 앞'],
+      ['example', '예시'],
+      ['description', '설명'],
+    ]),
+    queryParams: parseRowsByHeaders(getMarkdownSection(markdown, 'Query Params'), [
+      ['key', 'Key'],
+      ['type', 'Type'],
+      ['required', '필수'],
+      ['defaultValue', '기본값'],
+      ['example', '예시'],
+      ['description', '설명'],
+    ]),
+    bodyJson: extractJsonBlock(bodySectionText),
+    bodyFields: parseRowsByHeaders(bodySectionText, [
+      ['parentKey', 'UpKey'],
+      ['key', 'Key'],
+      ['type', 'Type'],
+      ['required', '필수'],
+      ['example', '예시'],
+      ['description', '설명'],
+    ]),
+    successJson: primarySuccessResponse.json,
+    responseFields: primarySuccessResponse.fields,
+    errors: parseRowsByHeaders(getMarkdownSection(markdown, 'Error Response'), [
+      ['status', 'Status'],
+      ['code', 'Code'],
+      ['message', 'Message'],
+      ['condition', '발생 상황'],
+    ]),
+  };
+};
+
+const readBrowserSpecSummaries = async () => {
+  const rootHandle = state.browserDirectoryHandle;
+  if (!rootHandle) {
+    throw new Error('NO_BROWSER_FOLDER');
+  }
+
+  const files = await collectBrowserMarkdownFiles(rootHandle, { rootName: rootHandle.name, handles: new Map() });
+  const specs = [];
+  const invalidFiles = [];
+
+  files.forEach((file) => {
+    try {
+      specs.push(getBrowserSpecSummary(file.markdown, file.name, file.path));
+    } catch {
+      invalidFiles.push(file.path);
+    }
+  });
+
+  specs.sort((a, b) => a.path.localeCompare(b.path, 'ko') || a.method.localeCompare(b.method, 'ko'));
+  return {
+    ok: true,
+    rootName: rootHandle.name,
+    rootPath: localFileLabel(rootHandle.name),
+    specs,
+    invalidFiles,
+  };
+};
+
+const refreshBrowserFileTree = async () => {
+  if (!state.browserDirectoryHandle) return;
+  const { tree, handles } = await readBrowserFileTree(state.browserDirectoryHandle);
+  state.fileTreeHandles = handles;
+  renderFileTree(tree);
+};
+
 const isBlankViewerValue = (value) => {
   const text = String(value ?? '').trim();
   return !text || ['미정', '없음', '해당 없음'].includes(text);
@@ -2664,16 +3011,19 @@ const openFolderViewer = async () => {
 
   setViewTransitionSkeleton(true, 'viewer');
   try {
-    const response = await fetch('/api/spec-viewer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!response.ok) {
-      const errorResult = await response.json().catch(() => ({}));
-      throw new Error(errorResult.message || '현재 파일 폴더의 명세서를 읽지 못했습니다.');
-    }
-
-    const result = await response.json();
+    const result = state.browserDirectoryHandle
+      ? await readBrowserSpecSummaries()
+      : await (async () => {
+          const response = await fetch('/api/spec-viewer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({}));
+            throw new Error(errorResult.message || '현재 파일 폴더의 명세서를 읽지 못했습니다.');
+          }
+          return response.json();
+        })();
     state.viewerCommon = '';
     state.viewerVersion = '';
     renderSpecViewer(result);
@@ -2699,9 +3049,18 @@ const focusFileLocation = () => {
 
 const setCurrentFile = (file) => {
   state.currentFile = file;
-  const currentFileDir = normalizeSaveDir(file.saveDir || getDirectoryPath(file.displayPath || file.path));
-  if (currentFileDir) {
-    state.saveDir = currentFileDir;
+  if (isBrowserFileSystemFile(file)) {
+    if (file.directoryHandle) {
+      state.browserSaveDirectoryHandle = file.directoryHandle;
+    }
+    if (file.saveDir) {
+      state.saveDir = file.saveDir;
+    }
+  } else {
+    const currentFileDir = normalizeSaveDir(file.saveDir || getDirectoryPath(file.displayPath || file.path));
+    if (currentFileDir) {
+      state.saveDir = currentFileDir;
+    }
   }
   state.activeTreeFilePath = '';
   markActiveTreeFile();
@@ -2793,6 +3152,61 @@ const saveMarkdown = async () => {
   const fileName = buildFileNameFromPath();
 
   if (state.currentFile) {
+    if (isBrowserFileSystemFile(state.currentFile)) {
+      try {
+        let nextFileHandle = state.currentFile.fileHandle;
+        let nextPath = state.currentFile.path || state.currentFile.fileName || fileName;
+        let nextDisplayPath = state.currentFile.displayPath || localFileLabel(fileName);
+        let nextFileName = state.currentFile.fileName || fileName;
+        const directoryHandle = state.currentFile.directoryHandle || state.browserSaveDirectoryHandle;
+        const shouldRename = directoryHandle && state.currentFile.fileName && state.currentFile.fileName !== fileName;
+
+        if (shouldRename) {
+          if (await browserFileExists(directoryHandle, fileName)) {
+            throw new Error('Target file already exists.');
+          }
+          nextFileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        }
+
+        await writeBrowserFile(nextFileHandle, markdown);
+
+        if (shouldRename) {
+          await directoryHandle.removeEntry(state.currentFile.fileName).catch(() => {});
+          const currentDirPath = getDirectoryPath(state.currentFile.path);
+          nextPath = currentDirPath ? `${currentDirPath}/${fileName}` : fileName;
+          nextFileName = fileName;
+          nextDisplayPath = state.browserDirectoryHandle
+            ? localFileLabel(state.browserDirectoryHandle.name, nextPath)
+            : localFileLabel(fileName);
+        }
+
+        setCurrentFile({
+          ...state.currentFile,
+          path: nextPath,
+          displayPath: nextDisplayPath,
+          fileName: nextFileName,
+          fileHandle: nextFileHandle,
+          directoryHandle,
+          saveDir: state.currentFile.saveDir || state.saveDir,
+        });
+        if (state.browserDirectoryHandle) {
+          await refreshBrowserFileTree();
+          state.activeTreeFilePath = nextPath;
+          markActiveTreeFile();
+        }
+        setStatus(`${nextDisplayPath} 저장됨`);
+        showSaveSuccessToast('현재 파일에 덮어썼습니다.');
+        return;
+      } catch (error) {
+        const message = error instanceof Error && error.message === 'Target file already exists.'
+          ? '변경된 파일명과 같은 파일이 이미 있습니다.'
+          : '현재 열려 있는 파일을 저장하지 못했습니다.';
+        showSaveFailureToast(message);
+        setStatus('저장 실패');
+        return;
+      }
+    }
+
     try {
       const response = await fetch('/api/save-current-file', {
         method: 'POST',
@@ -2848,6 +3262,57 @@ const saveMarkdownAsNew = async () => {
   }
 
   try {
+    if (state.browserSaveDirectoryHandle) {
+      if (await browserFileExists(state.browserSaveDirectoryHandle, fileName)) {
+        throw new Error('Target file already exists.');
+      }
+      const fileHandle = await state.browserSaveDirectoryHandle.getFileHandle(fileName, { create: true });
+      await writeBrowserFile(fileHandle, markdown);
+      const rootName = state.browserDirectoryHandle?.name || '';
+      const displayPath = rootName ? localFileLabel(rootName, fileName) : localFileLabel(fileName);
+      setCurrentFile({
+        origin: state.browserDirectoryHandle ? 'browser-tree' : 'browser-file',
+        path: fileName,
+        displayPath,
+        fileName,
+        saveDir: state.saveDir,
+        fileHandle,
+        directoryHandle: state.browserSaveDirectoryHandle,
+      });
+      if (state.browserDirectoryHandle) {
+        await refreshBrowserFileTree();
+        state.activeTreeFilePath = fileName;
+        markActiveTreeFile();
+      }
+      setStatus(`${displayPath} 새 파일 저장됨`);
+      showSaveSuccessToast('새 파일로 저장했습니다.');
+      return;
+    }
+
+    if ('showSaveFilePicker' in window) {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [
+          {
+            description: 'Markdown',
+            accept: { 'text/markdown': ['.md', '.markdown'] },
+          },
+        ],
+      });
+      await writeBrowserFile(fileHandle, markdown);
+      setCurrentFile({
+        origin: 'browser-file',
+        path: fileHandle.name || fileName,
+        displayPath: localFileLabel(fileHandle.name || fileName),
+        fileName: fileHandle.name || fileName,
+        saveDir: localFileLabel('선택한 파일'),
+        fileHandle,
+      });
+      setStatus(`${fileHandle.name || fileName} 새 파일 저장됨`);
+      showSaveSuccessToast('새 파일로 저장했습니다.');
+      return;
+    }
+
     const response = await fetch('/api/save-new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2905,9 +3370,19 @@ const applyOpenedFolder = (result, options = {}) => {
   } = options;
 
   if (clearFile) clearCurrentFile();
-  const openedFolderSaveDir = normalizeSaveDir(result.saveDir || result.rootPath);
-  if (openedFolderSaveDir) {
-    state.saveDir = openedFolderSaveDir;
+  if (result.origin === 'browser') {
+    state.browserDirectoryHandle = result.directoryHandle || null;
+    state.browserSaveDirectoryHandle = result.directoryHandle || null;
+    state.fileTreeHandles = result.fileHandles || new Map();
+    state.saveDir = result.saveDir || result.rootPath || result.rootName || '';
+  } else {
+    state.browserDirectoryHandle = null;
+    state.browserSaveDirectoryHandle = null;
+    state.fileTreeHandles = new Map();
+    const openedFolderSaveDir = normalizeSaveDir(result.saveDir || result.rootPath);
+    if (openedFolderSaveDir) {
+      state.saveDir = openedFolderSaveDir;
+    }
   }
   if (fileTreeRoot) {
     fileTreeRoot.textContent = result.rootPath || result.rootName || '선택한 폴더';
@@ -2924,6 +3399,26 @@ const openFileTreeFolder = async () => {
   setSpecViewerMode(false);
   showPageLoading('파일 폴더 여는 중...');
   try {
+    if (isBrowserFileSystemSupported()) {
+      const directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      if (!(await ensureBrowserWritePermission(directoryHandle))) {
+        throw new Error('FILE_PERMISSION_DENIED');
+      }
+      const { tree, handles } = await readBrowserFileTree(directoryHandle);
+      applyOpenedFolder({
+        ok: true,
+        origin: 'browser',
+        rootName: directoryHandle.name,
+        rootPath: localFileLabel(directoryHandle.name),
+        saveDir: localFileLabel(directoryHandle.name),
+        directoryHandle,
+        fileHandles: handles,
+        tree,
+      });
+      showToast('info', '폴더 열림', `${directoryHandle.name} 폴더를 열었습니다.`);
+      return;
+    }
+
     const response = await fetch('/api/choose-tree-root', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2943,6 +3438,25 @@ const openTreeMarkdownFile = async (path, fileName) => {
   setSpecViewerMode(false);
   showPageLoading('명세서 파일 여는 중...');
   try {
+    const browserFile = state.fileTreeHandles.get(path);
+    if (browserFile?.fileHandle) {
+      const file = await browserFile.fileHandle.getFile();
+      const markdown = await file.text();
+      loadMarkdownSpec(markdown || '', file.name || fileName);
+      setCurrentFile({
+        origin: 'browser-tree',
+        path,
+        displayPath: browserFile.displayPath || localFileLabel(state.browserDirectoryHandle?.name, path),
+        fileName: file.name || fileName,
+        saveDir: browserFile.saveDir || state.saveDir,
+        fileHandle: browserFile.fileHandle,
+        directoryHandle: browserFile.directoryHandle,
+      });
+      state.activeTreeFilePath = path;
+      markActiveTreeFile();
+      return;
+    }
+
     const response = await fetch('/api/read-tree-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2986,6 +3500,35 @@ const openMarkdownFile = async () => {
 
 const openMarkdownFromSaveDir = async () => {
   setSpecViewerMode(false);
+  if (isBrowserFileSystemSupported()) {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: 'Markdown',
+            accept: { 'text/markdown': ['.md', '.markdown'] },
+          },
+        ],
+      });
+      const file = await fileHandle.getFile();
+      const markdown = await file.text();
+      loadMarkdownSpec(markdown || '', file.name || '선택한 파일');
+      setCurrentFile({
+        origin: 'browser-file',
+        path: file.name || '',
+        displayPath: localFileLabel(file.name || '선택한 파일'),
+        fileName: file.name || '선택한 파일',
+        saveDir: state.saveDir || localFileLabel('선택한 파일'),
+        fileHandle,
+      });
+      return;
+    } catch {
+      setStatus('파일 열기 취소됨');
+      return;
+    }
+  }
+
   showPageLoading('파일 선택창 여는 중...');
   let result = null;
   try {
@@ -3019,6 +3562,10 @@ const openMarkdownFromSaveDir = async () => {
 };
 
 const restoreOpenedFolder = async () => {
+  if (isBrowserFileSystemSupported()) {
+    return;
+  }
+
   try {
     const response = await fetch('/api/current-tree-root');
     if (!response.ok) return;
