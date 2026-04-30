@@ -113,17 +113,31 @@ jobs:
           ssh veldoc-nas \
             "NAS_APP_DIR='$NAS_APP_DIR' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_B64='$GHCR_TOKEN_B64' sh -s" <<'REMOTE'
           set -eu
+          export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+          if command -v docker >/dev/null 2>&1; then
+            DOCKER="$(command -v docker)"
+          elif [ -x /usr/local/bin/docker ]; then
+            DOCKER="/usr/local/bin/docker"
+          elif [ -x /usr/bin/docker ]; then
+            DOCKER="/usr/bin/docker"
+          else
+            echo "Docker is not available in this SSH session."
+            exit 1
+          fi
 
           if [ -n "$GHCR_USERNAME" ] && [ -n "$GHCR_TOKEN_B64" ]; then
-            printf '%s' "$GHCR_TOKEN_B64" | base64 -d | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            printf '%s' "$GHCR_TOKEN_B64" | base64 -d | "$DOCKER" login ghcr.io -u "$GHCR_USERNAME" --password-stdin
           fi
 
           cd "$NAS_APP_DIR"
 
-          if docker compose version >/dev/null 2>&1; then
-            COMPOSE="docker compose"
+          if "$DOCKER" compose version >/dev/null 2>&1; then
+            COMPOSE="$DOCKER compose"
           elif command -v docker-compose >/dev/null 2>&1; then
             COMPOSE="docker-compose"
+          elif [ -x /usr/local/bin/docker-compose ]; then
+            COMPOSE="/usr/local/bin/docker-compose"
           else
             echo "Docker Compose is not installed on NAS."
             exit 1
@@ -131,5 +145,5 @@ jobs:
 
           $COMPOSE pull
           $COMPOSE up -d --remove-orphans
-          docker image prune -f
+          "$DOCKER" image prune -f
           REMOTE
