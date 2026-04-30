@@ -99,7 +99,7 @@ jobs:
           set -eu
           test -n "$NAS_SSH_USER"
           ssh veldoc-nas "mkdir -p '$NAS_APP_DIR/docs'"
-          scp docker-compose.yml "veldoc-nas:$NAS_APP_DIR/docker-compose.yml"
+          ssh veldoc-nas "cat > '$NAS_APP_DIR/docker-compose.yml'" < docker-compose.yml
 
       - name: Run on NAS
         env:
