@@ -7,8 +7,6 @@ services:
     restart: unless-stopped
     ports:
       - "6006:6006"
-    volumes:
-      - ./docs:/app/docs
     networks:
       - veldoc-network
 

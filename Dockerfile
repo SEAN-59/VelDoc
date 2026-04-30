@@ -6,8 +6,6 @@ COPY package.json ./
 COPY server.js ./server.js
 COPY public ./public
 
-RUN mkdir -p /app/docs
-
 EXPOSE 6006
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

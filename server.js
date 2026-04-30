@@ -12,6 +12,7 @@ const publicDir = resolve(rootDir, 'public');
 const userDocumentsDir = process.platform === 'darwin' ? resolve(homedir(), 'Documents') : resolve(rootDir, 'docs');
 const port = 6006;
 const host = '0.0.0.0';
+const serverFileApiEnabled = process.platform === 'darwin';
 const sessionCookieName = 'veldoc_session';
 const sessions = new Map();
 
@@ -154,6 +155,13 @@ const readJsonBody = async (request) => {
 const sendJson = (response, statusCode, payload) => {
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
+};
+
+const sendServerFileApiDisabled = (response) => {
+  sendJson(response, 403, {
+    ok: false,
+    message: 'Server file APIs are disabled. Use the browser file picker.',
+  });
 };
 
 const escapeAppleScriptString = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
@@ -660,6 +668,11 @@ const serveStatic = async (request, response) => {
 const server = createServer(async (request, response) => {
   try {
     const requestUrl = new URL(request.url ?? '/', `http://${request.headers.host}`);
+    if (requestUrl.pathname.startsWith('/api/') && !serverFileApiEnabled) {
+      sendServerFileApiDisabled(response);
+      return;
+    }
+
     const sessionState = requestUrl.pathname.startsWith('/api/')
       ? getSessionState(request, response)
       : null;
