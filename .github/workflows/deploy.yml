@@ -69,15 +69,27 @@ jobs:
       - name: Prepare SSH
         env:
           NAS_SSH_HOST: ${{ secrets.NAS_SSH_HOST }}
+          NAS_SSH_USER: ${{ secrets.NAS_SSH_USER }}
           NAS_SSH_PRIVATE_KEY: ${{ secrets.NAS_SSH_PRIVATE_KEY }}
         run: |
           set -eu
           test -n "$NAS_SSH_HOST"
+          test -n "$NAS_SSH_USER"
           test -n "$NAS_SSH_PRIVATE_KEY"
           mkdir -p ~/.ssh
           printf '%s\n' "$NAS_SSH_PRIVATE_KEY" > ~/.ssh/veldoc_nas
           chmod 600 ~/.ssh/veldoc_nas
           ssh-keyscan -p "$NAS_SSH_PORT" "$NAS_SSH_HOST" >> ~/.ssh/known_hosts
+          {
+            echo "Host veldoc-nas"
+            echo "  HostName $NAS_SSH_HOST"
+            echo "  User $NAS_SSH_USER"
+            echo "  Port $NAS_SSH_PORT"
+            echo "  IdentityFile ~/.ssh/veldoc_nas"
+            echo "  IdentitiesOnly yes"
+            echo "  BatchMode yes"
+            echo "  StrictHostKeyChecking yes"
+          } > ~/.ssh/config
 
       - name: Upload compose file
         env:
@@ -86,8 +98,8 @@ jobs:
         run: |
           set -eu
           test -n "$NAS_SSH_USER"
-          ssh -i ~/.ssh/veldoc_nas -p "$NAS_SSH_PORT" "$NAS_SSH_USER@$NAS_SSH_HOST" "mkdir -p '$NAS_APP_DIR/docs'"
-          scp -i ~/.ssh/veldoc_nas -P "$NAS_SSH_PORT" docker-compose.yml "$NAS_SSH_USER@$NAS_SSH_HOST:$NAS_APP_DIR/docker-compose.yml"
+          ssh veldoc-nas "mkdir -p '$NAS_APP_DIR/docs'"
+          scp docker-compose.yml "veldoc-nas:$NAS_APP_DIR/docker-compose.yml"
 
       - name: Run on NAS
         env:
@@ -98,7 +110,7 @@ jobs:
         run: |
           set -eu
           GHCR_TOKEN_B64="$(printf '%s' "$GHCR_TOKEN" | base64 | tr -d '\n')"
-          ssh -i ~/.ssh/veldoc_nas -p "$NAS_SSH_PORT" "$NAS_SSH_USER@$NAS_SSH_HOST" \
+          ssh veldoc-nas \
             "NAS_APP_DIR='$NAS_APP_DIR' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN_B64='$GHCR_TOKEN_B64' sh -s" <<'REMOTE'
           set -eu
 
