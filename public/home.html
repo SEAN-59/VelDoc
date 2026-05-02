@@ -27,6 +27,70 @@
     <link rel="stylesheet" href="./assets/css/styles.css?v=20260430-home-disabled-1" />
   </head>
   <body class="home-page">
+    <div class="toast-container" id="homeToastContainer" aria-live="polite" aria-atomic="false"></div>
+    <button class="help-button home-help-button" id="homeHelpButton" type="button" aria-label="도우미 열기" aria-haspopup="dialog" aria-expanded="false" aria-controls="homeHelpDialog">?</button>
+    <div class="help-dialog-overlay" id="homeHelpDialog" role="dialog" aria-modal="true" aria-labelledby="homeHelpDialogTitle" hidden>
+      <div class="help-dialog-box">
+        <div class="help-dialog-head">
+          <h2 id="homeHelpDialogTitle">도우미</h2>
+          <button class="icon-button help-dialog-close" id="homeHelpDialogCloseButton" type="button" aria-label="도우미 닫기">×</button>
+        </div>
+        <div class="help-dialog-body">
+          <div class="help-topic-grid" role="tablist" aria-label="홈 도우미 주제">
+            <button class="help-topic-card active" type="button" role="tab" aria-selected="true" data-home-help-topic="folder">
+              <strong>폴더 선택</strong>
+              <span>어디를 열어야 하는지</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-home-help-topic="actions">
+              <strong>버튼 동작</strong>
+              <span>누르면 생기는 일</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-home-help-topic="structure">
+              <strong>생성 구조</strong>
+              <span>VelDoc 폴더 구성</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-home-help-topic="session">
+              <strong>세션 유지</strong>
+              <span>새로고침과 권한</span>
+            </button>
+          </div>
+          <div class="help-content">
+            <section class="help-section active" data-home-help-section="folder">
+              <h3>폴더 선택 기준</h3>
+              <p>열기에서는 문서를 저장할 프로젝트 폴더를 선택합니다<br>선택한 폴더 안에 VelDoc이 사용할 <strong>veldoc</strong> 폴더가 생성됩니다</p>
+              <dl class="help-file-list">
+                <div>
+                  <dt>선택하는 위치</dt>
+                  <dd>문서를 모아둘 최상위 작업 폴더입니다<br>예를 들어 ProjectA를 선택하면 ProjectA/veldoc 아래에 문서 폴더가 생깁니다</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="help-section" data-home-help-section="actions">
+              <h3>버튼 동작</h3>
+              <p>각 버튼은 필요한 문서 폴더를 먼저 확인합니다<br>폴더가 없으면 새로 만들고 이미 있으면 그대로 연결합니다</p>
+              <dl class="help-file-list">
+                <div><dt>API 명세서</dt><dd>veldoc/api를 준비한 뒤 API 명세서 에디터로 이동합니다</dd></div>
+                <div><dt>나머지 문서 버튼</dt><dd>해당 문서 폴더만 만들고 현재 홈 화면에 머무릅니다</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-home-help-section="structure">
+              <h3>생성 구조</h3>
+              <dl class="help-file-list">
+                <div><dt>veldoc/wbs</dt><dd>WBS 문서 폴더입니다</dd></div>
+                <div><dt>veldoc/srs</dt><dd>요구사항 정의서 문서 폴더입니다</dd></div>
+                <div><dt>veldoc/fsd</dt><dd>기능 명세서 문서 폴더입니다</dd></div>
+                <div><dt>veldoc/api</dt><dd>API 명세서 문서 폴더입니다</dd></div>
+                <div><dt>veldoc/table</dt><dd>DB 테이블 정의서 문서 폴더입니다</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-home-help-section="session">
+              <h3>세션 유지</h3>
+              <p>브라우저 권한이 유지되는 동안 선택한 폴더를 다시 사용합니다<br>권한이 만료되거나 다른 브라우저를 쓰면 열기에서 다시 폴더를 허용해야 합니다</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
     <main class="home-shell" aria-label="VelDoc">
       <section class="home-content">
         <div class="home-title-block">
@@ -34,14 +98,42 @@
             <img class="home-title-image" src="./assets/images/Title.png?v=20260430-1" alt="VelDoc" />
           </h1>
           <p>개발 문서를 정리하는 가장 귀여운 방법</p>
+          <div class="home-folder-group input-group" aria-label="VelDoc 작업 폴더">
+            <input
+              class="home-folder-input input"
+              id="homeFolderStatus"
+              type="text"
+              value="작업 공간을 선택해주세요."
+              aria-label="선택된 VelDoc 작업 폴더"
+              readonly
+            />
+            <button class="home-folder-button input-group-btn" id="homeFolderOpenButton" type="button">열기</button>
+          </div>
+          <p class="home-folder-help">
+            <span aria-hidden="true">※</span>
+            VelDoc 폴더를 만들 상위 폴더를 선택하세요.
+          </p>
         </div>
         <nav class="home-actions" aria-label="문서 작성기 선택">
-          <a class="home-action home-action-api" href="./pages/apieditor.html">API 명세서 작성기</a>
-          <button class="home-action home-action-db" type="button" title="준비 중입니다." disabled>
+          <button class="home-action home-action-wbs" type="button" data-editor-dir="wbs" disabled>
+            <span class="home-action-title">WBS</span>
+            <span class="home-action-status">준비 중</span>
+          </button>
+          <button class="home-action home-action-srs" type="button" data-editor-dir="srs" disabled>
+            <span class="home-action-title">요구사항 정의서</span>
+            <span class="home-action-status">준비 중</span>
+          </button>
+          <button class="home-action home-action-fs" type="button" data-editor-dir="fsd" disabled>
+            <span class="home-action-title">기능 명세서</span>
+            <span class="home-action-status">준비 중</span>
+          </button>
+          <a class="home-action home-action-api" href="./pages/apieditor.html" data-editor-dir="api">API 명세서</a>
+          <button class="home-action home-action-db" type="button" data-editor-dir="table" disabled>
             <span class="home-action-title">DB 테이블 정의서</span>
             <span class="home-action-status">준비 중</span>
           </button>
         </nav>
+        <p class="home-actions-help">자세한 안내는 우측 상단의 도우미 버튼을 이용해주세요</p>
       </section>
       <footer class="home-footer">
         <p>Created by Sean.Kim</p>

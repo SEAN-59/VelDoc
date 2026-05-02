@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile, writeFile, readdir, rename, stat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -15,6 +15,14 @@ const host = '0.0.0.0';
 const serverFileApiEnabled = process.platform === 'darwin';
 const sessionCookieName = 'veldoc_session';
 const sessions = new Map();
+const basicApiMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+const authPolicyFileName = 'veldoc-auth-policies.json';
+const legacyAuthPolicyDirectoryName = '.veldoc';
+const legacyAuthPolicyFileName = 'auth-policies.json';
+const authPolicyVersion = 2;
+const veldocWorkspaceDirectoryName = 'veldoc';
+const apiEditorDirectoryName = 'api';
+const homeEditorDirectoryNames = new Set(['wbs', 'srs', 'fsd', apiEditorDirectoryName, 'table']);
 
 const staticPathAliases = new Map([
   ['/index.html', '/home.html'],
@@ -49,6 +57,60 @@ const isInside = (parentDir, targetPath) => {
 };
 
 const isMarkdownFile = (filePath) => ['.md', '.markdown'].includes(extname(filePath).toLowerCase());
+
+const getVelDocWorkspaceRoot = (workspaceRoot) => resolve(workspaceRoot, veldocWorkspaceDirectoryName);
+
+const getVelDocEditorRoot = (workspaceRoot, editorName = apiEditorDirectoryName) =>
+  resolve(getVelDocWorkspaceRoot(workspaceRoot), editorName);
+
+const getVelDocEditorRootName = (workspaceRoot, editorName = apiEditorDirectoryName) =>
+  [basename(workspaceRoot), veldocWorkspaceDirectoryName, editorName].join('/');
+
+const getVelDocWorkspaceRootName = (workspaceRoot) =>
+  [basename(workspaceRoot), veldocWorkspaceDirectoryName].join('/');
+
+const ensureVelDocWorkspace = async (workspaceRoot) => {
+  const veldocRoot = getVelDocWorkspaceRoot(workspaceRoot);
+
+  if (!isInside(workspaceRoot, veldocRoot)) {
+    throw new Error('Invalid VelDoc workspace path.');
+  }
+
+  await mkdir(veldocRoot, { recursive: true });
+  return {
+    veldocRoot,
+  };
+};
+
+const ensureVelDocApiWorkspace = async (workspaceRoot) => {
+  const { editorRoot: apiRoot } = await ensureVelDocEditorWorkspace(workspaceRoot, apiEditorDirectoryName);
+  return {
+    apiRoot,
+  };
+};
+
+const ensureVelDocEditorWorkspace = async (workspaceRoot, editorName) => {
+  if (!homeEditorDirectoryNames.has(editorName)) {
+    throw new Error('Invalid VelDoc editor name.');
+  }
+
+  await ensureVelDocWorkspace(workspaceRoot);
+  const editorRoot = getVelDocEditorRoot(workspaceRoot, editorName);
+
+  if (!isInside(workspaceRoot, editorRoot)) {
+    throw new Error('Invalid VelDoc workspace path.');
+  }
+
+  await mkdir(editorRoot, { recursive: true });
+  return {
+    editorRoot,
+  };
+};
+
+const normalizeBasicApiMethod = (value, fallback = 'POST') => {
+  const method = String(value ?? '').trim().toUpperCase();
+  return basicApiMethods.has(method) ? method : fallback;
+};
 
 const safeOutputDir = (value) => {
   const raw = String(value ?? '')
@@ -88,6 +150,7 @@ const parseCookies = (cookieHeader = '') =>
     }, {});
 
 const createSessionState = () => ({
+  workspaceRoot: null,
   fileTreeRoot: null,
   isFileTreeRootOpened: false,
   updatedAt: Date.now(),
@@ -160,7 +223,7 @@ const sendJson = (response, statusCode, payload) => {
 const sendServerFileApiDisabled = (response) => {
   sendJson(response, 403, {
     ok: false,
-    message: 'Server file APIs are disabled. Use the browser file picker.',
+    message: 'Server file APIs are disabled.\nUse the browser file picker.',
   });
 };
 
@@ -244,6 +307,9 @@ const getMarkdownTableValue = (markdown, key) => {
   return cleanMarkdownValue(match?.[1] ?? '');
 };
 
+const getSubCategoryTableValue = (markdown) =>
+  getMarkdownTableValue(markdown, '하분류') || getMarkdownTableValue(markdown, 'Swagger Tag');
+
 const getMarkdownSection = (markdown, title) => {
   const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(`^##\\s+\\d+\\.\\s+${escapedTitle}\\s*$`, 'm').exec(markdown);
@@ -318,7 +384,10 @@ const parseRowsByHeaders = (section, mapping) => {
   const tableData = parseMarkdownTables(section)[0];
   if (!tableData) return [];
 
-  const indexes = mapping.map(([, header]) => tableData.headers.findIndex((cell) => cell === header));
+  const indexes = mapping.map(([, header]) => {
+    const aliases = Array.isArray(header) ? header : [header];
+    return tableData.headers.findIndex((cell) => aliases.includes(cell));
+  });
   return tableData.rows
     .map((row) =>
       mapping.reduce((acc, [key], index) => {
@@ -389,10 +458,9 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
   }
 
   const segments = splitApiPath(pathValue);
-  const rawSwaggerTag = segments[2] || getMarkdownTableValue(basicSection, 'Swagger Tag');
+  const rawSwaggerTag = segments[2] || getSubCategoryTableValue(basicSection);
   const swaggerTag = isEmptySpecGroupValue(rawSwaggerTag) ? '/' : rawSwaggerTag;
-  const method = getMarkdownTableValue(basicSection, 'Method').toUpperCase();
-  const normalizedMethod = ['GET', 'POST'].includes(method) ? method : 'POST';
+  const normalizedMethod = normalizeBasicApiMethod(getMarkdownTableValue(basicSection, 'Method'));
 
   return {
     fileName: basename(filePath),
@@ -402,18 +470,18 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
     path: pathValue,
     commonPath: segments[0] || '/',
     versionPath: segments[1] || '/',
-    clients: getMarkdownTableValue(basicSection, '사용처') || '미정',
     purpose: getMarkdownTableValue(basicSection, '목적') || '미정',
     swaggerTag,
     authRequired: getMarkdownTableValue(authSection, '인증 필요 여부') || '미정',
     authScheme: getMarkdownTableValue(authSection, '인증 방식') || '미정',
+    authPolicyScope: getMarkdownTableValue(authSection, '적용 범위') || '미정',
     roles: getMarkdownTableValue(authSection, '접근 가능 Role') || '미정',
     permissionRules: getMarkdownTableValue(authSection, '권한 규칙') || '미정',
     successStatus: primarySuccessResponse.status,
     successResponses,
     headers: parseRowsByHeaders(getMarkdownSection(markdown, 'Headers'), [
       ['key', 'Key'],
-      ['value', 'Value 예시'],
+      ['value', ['Value', 'Value 예시']],
       ['required', '필수'],
       ['description', '설명'],
     ]),
@@ -468,7 +536,12 @@ const readSpecSummaries = async (directory) => {
   }
 
   specs.sort((a, b) => a.path.localeCompare(b.path, 'ko') || a.method.localeCompare(b.method, 'ko'));
-  return { specs, invalidFiles };
+  return {
+    specs,
+    invalidFiles,
+    apiPaths: getApiPathsFromFiles(files),
+    specFiles: getSpecFilesFromFiles(files),
+  };
 };
 
 const splitApiPath = (value) =>
@@ -477,6 +550,11 @@ const splitApiPath = (value) =>
     .split('/')
     .map((segment) => segment.trim())
     .filter(Boolean);
+
+const normalizeSpecApiPath = (value) => {
+  const segments = splitApiPath(value);
+  return segments.length > 0 ? `/${segments.join('/')}` : '/';
+};
 
 const isEmptySpecGroupValue = (value) => {
   const text = cleanMarkdownValue(value);
@@ -490,8 +568,9 @@ const getSpecGrouping = async (filePath) => {
     const pathValue = getMarkdownTableValue(basicSection, 'Path');
     if (!pathValue || pathValue.includes('예:')) throw new Error('Invalid spec path');
 
+    const method = cleanMarkdownValue(getMarkdownTableValue(basicSection, 'Method')).toUpperCase();
     const segments = splitApiPath(pathValue);
-    const swaggerTagSegments = splitApiPath(getMarkdownTableValue(basicSection, 'Swagger Tag'));
+    const swaggerTagSegments = splitApiPath(getSubCategoryTableValue(basicSection));
     const common = segments[0] || '/';
     const version = segments[1] || '/';
     const rawSwaggerTag = segments[2] || swaggerTagSegments[0] || '';
@@ -500,13 +579,16 @@ const getSpecGrouping = async (filePath) => {
     const actionSegments = segments.slice(3);
 
     return {
+      apiPath: normalizeSpecApiPath(pathValue),
       groups: [common, version, swaggerTag].filter(Boolean),
       label: actionSegments.length > 0 ? `/${actionSegments.join('/')}` : '/',
+      method,
     };
   } catch {
     return {
       groups: ['양식 외', '미정', '미정'],
       label: basename(filePath),
+      method: '',
     };
   }
 };
@@ -586,6 +668,7 @@ const toGroupedTree = (files) => {
       type: 'file',
       name: file.name,
       label: file.label,
+      method: file.method,
       path: file.path,
     });
   });
@@ -612,9 +695,26 @@ const toGroupedTree = (files) => {
   return serialize(rootGroups);
 };
 
-const readFileTree = async (directory) => {
+const getApiPathsFromFiles = (files) =>
+  [...new Set(files.map((file) => file.apiPath).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'ko'));
+
+const getSpecFilesFromFiles = (files) =>
+  files
+    .filter((file) => file.path && file.apiPath)
+    .map((file) => ({
+      path: file.path,
+      apiPath: file.apiPath,
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path, 'ko') || a.apiPath.localeCompare(b.apiPath, 'ko'));
+
+const readFileTreePayload = async (directory) => {
   const files = await collectMarkdownFiles(directory);
-  return toGroupedTree(files);
+  return {
+    tree: toGroupedTree(files),
+    apiPaths: getApiPathsFromFiles(files),
+    specFiles: getSpecFilesFromFiles(files),
+  };
 };
 
 const fileExists = async (filePath) => {
@@ -624,6 +724,80 @@ const fileExists = async (filePath) => {
   } catch {
     return false;
   }
+};
+
+const createDefaultAuthPolicies = () => ({
+  version: authPolicyVersion,
+  policies: {},
+});
+
+const normalizeAuthPolicyPath = (value) => {
+  const segments = String(value ?? '')
+    .trim()
+    .replaceAll('\\', '/')
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return segments.length > 0 ? `/${segments.join('/')}` : '/';
+};
+
+const normalizeAuthPolicyRecord = (record) => {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return {};
+
+  const normalized = {};
+  if (Array.isArray(record.roles)) {
+    normalized.roles = [...new Set(record.roles.map((role) => String(role ?? '').trim()).filter(Boolean))];
+  }
+  return normalized;
+};
+
+const normalizeAuthPolicies = (source) => {
+  const normalized = createDefaultAuthPolicies();
+  const policies = source?.policies && typeof source.policies === 'object' ? source.policies : {};
+
+  Object.entries(policies).forEach(([path, policy]) => {
+    const normalizedPath = normalizeAuthPolicyPath(path);
+    const normalizedPolicy = normalizeAuthPolicyRecord(policy);
+    if ((normalizedPolicy.roles || []).length > 0) {
+      normalized.policies[normalizedPath] = normalizedPolicy;
+    }
+  });
+
+  return normalized;
+};
+
+const getAuthPolicyFilePath = (fileTreeRoot) =>
+  resolve(fileTreeRoot, authPolicyFileName);
+
+const getLegacyAuthPolicyFilePath = (fileTreeRoot) =>
+  resolve(fileTreeRoot, legacyAuthPolicyDirectoryName, legacyAuthPolicyFileName);
+
+const readAuthPolicies = async (fileTreeRoot) => {
+  try {
+    const policyFilePath = getAuthPolicyFilePath(fileTreeRoot);
+    if (!isInside(fileTreeRoot, policyFilePath)) return createDefaultAuthPolicies();
+    return normalizeAuthPolicies(JSON.parse(await readFile(policyFilePath, 'utf8')));
+  } catch {
+    try {
+      const legacyPolicyFilePath = getLegacyAuthPolicyFilePath(fileTreeRoot);
+      if (!isInside(fileTreeRoot, legacyPolicyFilePath)) return createDefaultAuthPolicies();
+      return normalizeAuthPolicies(JSON.parse(await readFile(legacyPolicyFilePath, 'utf8')));
+    } catch {
+      return createDefaultAuthPolicies();
+    }
+  }
+};
+
+const writeAuthPolicies = async (fileTreeRoot, authPolicies) => {
+  const policyFilePath = getAuthPolicyFilePath(fileTreeRoot);
+  if (!isInside(fileTreeRoot, policyFilePath)) {
+    throw new Error('Invalid auth policy path.');
+  }
+
+  await mkdir(dirname(policyFilePath), { recursive: true });
+  await writeFile(policyFilePath, `${JSON.stringify(normalizeAuthPolicies(authPolicies), null, 2)}\n`, 'utf8');
 };
 
 const getExistingDirectory = async (...candidates) => {
@@ -677,27 +851,140 @@ const server = createServer(async (request, response) => {
       ? getSessionState(request, response)
       : null;
 
-    if (request.method === 'POST' && requestUrl.pathname === '/api/choose-tree-root') {
-      const defaultDir = await getExistingDirectory(sessionState.fileTreeRoot, userDocumentsDir, rootDir);
-      const selectedPath = resolve(
-        await chooseFolderFromFinder(defaultDir, '파일 목록으로 열 폴더를 선택하세요.'),
+    if (request.method === 'POST' && requestUrl.pathname === '/api/choose-workspace-root') {
+      const defaultDir = await getExistingDirectory(sessionState.workspaceRoot, userDocumentsDir, rootDir);
+      const selectedWorkspaceRoot = resolve(
+        await chooseFolderFromFinder(defaultDir, 'VelDoc 작업 폴더를 선택하세요.'),
       );
+      const { veldocRoot } = await ensureVelDocWorkspace(selectedWorkspaceRoot);
 
-      sessionState.fileTreeRoot = selectedPath;
-      sessionState.isFileTreeRootOpened = true;
-      const tree = await readFileTree(sessionState.fileTreeRoot);
+      sessionState.workspaceRoot = selectedWorkspaceRoot;
+      sessionState.fileTreeRoot = null;
+      sessionState.isFileTreeRootOpened = false;
+
       sendJson(response, 200, {
         ok: true,
-        rootName: basename(sessionState.fileTreeRoot),
+        opened: true,
+        rootName: getVelDocWorkspaceRootName(sessionState.workspaceRoot),
+        workspaceRoot: sessionState.workspaceRoot,
+        rootPath: veldocRoot,
+        saveDir: veldocRoot,
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname === '/api/current-workspace-root') {
+      if (!sessionState.workspaceRoot) {
+        sendJson(response, 200, {
+          ok: true,
+          opened: false,
+        });
+        return;
+      }
+
+      const { veldocRoot } = await ensureVelDocWorkspace(sessionState.workspaceRoot);
+      sendJson(response, 200, {
+        ok: true,
+        opened: true,
+        rootName: getVelDocWorkspaceRootName(sessionState.workspaceRoot),
+        workspaceRoot: sessionState.workspaceRoot,
+        rootPath: veldocRoot,
+        saveDir: veldocRoot,
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/open-api-editor-root') {
+      let selectedWorkspaceRoot = sessionState.workspaceRoot;
+      if (!selectedWorkspaceRoot) {
+        const defaultDir = await getExistingDirectory(userDocumentsDir, rootDir);
+        selectedWorkspaceRoot = resolve(
+          await chooseFolderFromFinder(defaultDir, 'VelDoc 작업 폴더를 선택하세요.'),
+        );
+      }
+
+      const { apiRoot } = await ensureVelDocApiWorkspace(selectedWorkspaceRoot);
+
+      sessionState.workspaceRoot = selectedWorkspaceRoot;
+      sessionState.fileTreeRoot = apiRoot;
+      sessionState.isFileTreeRootOpened = true;
+      const treePayload = await readFileTreePayload(sessionState.fileTreeRoot);
+      const rootName = getVelDocEditorRootName(sessionState.workspaceRoot);
+      sendJson(response, 200, {
+        ok: true,
+        opened: true,
+        rootName,
+        workspaceRootName: getVelDocWorkspaceRootName(sessionState.workspaceRoot),
+        workspaceRoot: sessionState.workspaceRoot,
         rootPath: sessionState.fileTreeRoot,
         saveDir: sessionState.fileTreeRoot,
-        tree,
+        ...treePayload,
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/open-editor-root') {
+      const payload = await readJsonBody(request);
+      const editorName = String(payload.editor ?? '').trim();
+      if (!homeEditorDirectoryNames.has(editorName)) {
+        sendJson(response, 400, { ok: false, message: 'Invalid editor directory.' });
+        return;
+      }
+
+      let selectedWorkspaceRoot = sessionState.workspaceRoot;
+      if (!selectedWorkspaceRoot) {
+        const defaultDir = await getExistingDirectory(userDocumentsDir, rootDir);
+        selectedWorkspaceRoot = resolve(
+          await chooseFolderFromFinder(defaultDir, 'VelDoc 작업 폴더를 선택하세요.'),
+        );
+      }
+
+      const { editorRoot } = await ensureVelDocEditorWorkspace(selectedWorkspaceRoot, editorName);
+
+      sessionState.workspaceRoot = selectedWorkspaceRoot;
+      if (editorName === apiEditorDirectoryName) {
+        sessionState.fileTreeRoot = editorRoot;
+        sessionState.isFileTreeRootOpened = true;
+      }
+
+      sendJson(response, 200, {
+        ok: true,
+        opened: true,
+        editor: editorName,
+        rootName: getVelDocEditorRootName(sessionState.workspaceRoot, editorName),
+        workspaceRootName: getVelDocWorkspaceRootName(sessionState.workspaceRoot),
+        workspaceRoot: sessionState.workspaceRoot,
+        rootPath: editorRoot,
+        saveDir: editorRoot,
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/choose-tree-root') {
+      const defaultDir = await getExistingDirectory(sessionState.workspaceRoot, userDocumentsDir, rootDir);
+      const selectedWorkspaceRoot = resolve(
+        await chooseFolderFromFinder(defaultDir, '파일 목록으로 열 폴더를 선택하세요.'),
+      );
+      const { apiRoot } = await ensureVelDocApiWorkspace(selectedWorkspaceRoot);
+
+      sessionState.workspaceRoot = selectedWorkspaceRoot;
+      sessionState.fileTreeRoot = apiRoot;
+      sessionState.isFileTreeRootOpened = true;
+      const treePayload = await readFileTreePayload(sessionState.fileTreeRoot);
+      const rootName = getVelDocEditorRootName(sessionState.workspaceRoot);
+      sendJson(response, 200, {
+        ok: true,
+        rootName,
+        workspaceRoot: sessionState.workspaceRoot,
+        rootPath: sessionState.fileTreeRoot,
+        saveDir: sessionState.fileTreeRoot,
+        ...treePayload,
       });
       return;
     }
 
     if (request.method === 'GET' && requestUrl.pathname === '/api/current-tree-root') {
-      const { fileTreeRoot } = sessionState;
+      const { fileTreeRoot, workspaceRoot } = sessionState;
       if (!fileTreeRoot) {
         sendJson(response, 200, {
           ok: true,
@@ -706,20 +993,52 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const tree = await readFileTree(fileTreeRoot);
+      const treePayload = await readFileTreePayload(fileTreeRoot);
+      const rootName = workspaceRoot ? getVelDocEditorRootName(workspaceRoot) : basename(fileTreeRoot);
       sendJson(response, 200, {
         ok: true,
         opened: true,
-        rootName: basename(fileTreeRoot),
+        rootName,
+        workspaceRoot,
         rootPath: fileTreeRoot,
         saveDir: fileTreeRoot,
-        tree,
+        ...treePayload,
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname === '/api/auth-policies') {
+      const { fileTreeRoot, isFileTreeRootOpened } = sessionState;
+      if (!isFileTreeRootOpened || !fileTreeRoot) {
+        sendJson(response, 409, { ok: false, message: '먼저 명세서 폴더를 열어주세요.' });
+        return;
+      }
+
+      sendJson(response, 200, {
+        ok: true,
+        authPolicies: await readAuthPolicies(fileTreeRoot),
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/auth-policies') {
+      const { fileTreeRoot, isFileTreeRootOpened } = sessionState;
+      if (!isFileTreeRootOpened || !fileTreeRoot) {
+        sendJson(response, 409, { ok: false, message: '먼저 명세서 폴더를 열어주세요.' });
+        return;
+      }
+
+      const payload = await readJsonBody(request);
+      await writeAuthPolicies(fileTreeRoot, payload.authPolicies);
+      sendJson(response, 200, {
+        ok: true,
+        authPolicies: await readAuthPolicies(fileTreeRoot),
       });
       return;
     }
 
     if (request.method === 'POST' && requestUrl.pathname === '/api/spec-viewer') {
-      const { fileTreeRoot, isFileTreeRootOpened } = sessionState;
+      const { fileTreeRoot, isFileTreeRootOpened, workspaceRoot } = sessionState;
       if (!isFileTreeRootOpened || !fileTreeRoot) {
         sendJson(response, 409, {
           ok: false,
@@ -728,13 +1047,15 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const { specs, invalidFiles } = await readSpecSummaries(fileTreeRoot);
+      const { specs, invalidFiles, apiPaths, specFiles } = await readSpecSummaries(fileTreeRoot);
       sendJson(response, 200, {
         ok: true,
-        rootName: basename(fileTreeRoot),
+        rootName: workspaceRoot ? getVelDocEditorRootName(workspaceRoot) : basename(fileTreeRoot),
         rootPath: fileTreeRoot,
         specs,
         invalidFiles,
+        apiPaths,
+        specFiles,
       });
       return;
     }
@@ -773,7 +1094,7 @@ const server = createServer(async (request, response) => {
       const origin = String(payload.origin ?? '');
       const relativePath = String(payload.path ?? '').replaceAll('\\', '/');
       const markdown = String(payload.markdown ?? '');
-      const fileTreeRoot = sessionState.fileTreeRoot;
+      const { fileTreeRoot } = sessionState;
       const baseDir = origin === 'tree' ? fileTreeRoot : origin === 'root' ? rootDir : null;
 
       if (!baseDir) {
@@ -798,13 +1119,64 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === 'POST' && requestUrl.pathname === '/api/read-current-file') {
+      const payload = await readJsonBody(request);
+      const origin = String(payload.origin ?? '');
+      const relativePath = String(payload.path ?? '').replaceAll('\\', '/');
+      const { fileTreeRoot } = sessionState;
+      const baseDir = origin === 'tree'
+        ? fileTreeRoot
+        : origin === 'root'
+          ? rootDir
+          : origin === 'absolute'
+            ? dirname(resolve(relativePath))
+            : null;
+
+      if (!baseDir) {
+        sendJson(response, 400, { ok: false, message: 'Invalid file origin.' });
+        return;
+      }
+
+      const selectedPath = origin === 'absolute'
+        ? resolve(relativePath)
+        : resolve(baseDir, relativePath.replace(/^\.\//, ''));
+
+      if (!isInside(baseDir, selectedPath) || !isMarkdownFile(selectedPath)) {
+        sendJson(response, 400, { ok: false, message: 'Invalid markdown file.' });
+        return;
+      }
+
+      const markdown = await readFile(selectedPath, 'utf8');
+      const fileMeta = origin === 'absolute'
+        ? buildAbsoluteFileResponsePath(selectedPath)
+        : origin === 'tree'
+          ? {
+              origin: 'tree',
+              path: relative(fileTreeRoot, selectedPath).replaceAll('\\', '/'),
+              saveDir: dirname(selectedPath),
+            }
+          : {
+              ...buildFileResponsePath(selectedPath, fileTreeRoot),
+              saveDir: dirname(selectedPath),
+            };
+
+      sendJson(response, 200, {
+        ok: true,
+        fileName: basename(selectedPath),
+        ...fileMeta,
+        absolutePath: selectedPath,
+        markdown,
+      });
+      return;
+    }
+
     if (request.method === 'POST' && requestUrl.pathname === '/api/save-current-file') {
       const payload = await readJsonBody(request);
       const origin = String(payload.origin ?? '');
       const relativePath = String(payload.path ?? '').replaceAll('\\', '/');
       const nextFileName = safeFileName(payload.fileName);
       const markdown = String(payload.markdown ?? '');
-      const fileTreeRoot = sessionState.fileTreeRoot;
+      const { fileTreeRoot, workspaceRoot } = sessionState;
       const baseDir = origin === 'tree'
         ? fileTreeRoot
         : origin === 'root'
@@ -856,15 +1228,61 @@ const server = createServer(async (request, response) => {
               ...buildFileResponsePath(nextPath, fileTreeRoot),
               saveDir: dirname(nextPath),
             };
-      const tree = fileTreeRoot ? await readFileTree(fileTreeRoot) : [];
+      const treePayload = fileTreeRoot ? await readFileTreePayload(fileTreeRoot) : { tree: [], apiPaths: [], specFiles: [] };
       sendJson(response, 200, {
         ok: true,
         fileName: basename(nextPath),
         ...fileMeta,
         absolutePath: nextPath,
-        rootName: fileTreeRoot ? basename(fileTreeRoot) : '',
+        rootName: fileTreeRoot ? (workspaceRoot ? getVelDocEditorRootName(workspaceRoot) : basename(fileTreeRoot)) : '',
+        workspaceRoot,
         rootPath: fileTreeRoot,
-        tree,
+        ...treePayload,
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/delete-current-file') {
+      const payload = await readJsonBody(request);
+      const origin = String(payload.origin ?? '');
+      const relativePath = String(payload.path ?? '').replaceAll('\\', '/');
+      const { fileTreeRoot, workspaceRoot } = sessionState;
+      const baseDir = origin === 'tree'
+        ? fileTreeRoot
+        : origin === 'root'
+          ? rootDir
+          : origin === 'absolute'
+            ? dirname(resolve(relativePath))
+            : null;
+
+      if (!baseDir) {
+        sendJson(response, 400, { ok: false, message: 'Invalid file origin.' });
+        return;
+      }
+
+      const selectedPath = origin === 'absolute'
+        ? resolve(relativePath)
+        : resolve(baseDir, relativePath.replace(/^\.\//, ''));
+
+      if (!isInside(baseDir, selectedPath) || !isMarkdownFile(selectedPath)) {
+        sendJson(response, 400, { ok: false, message: 'Invalid markdown file.' });
+        return;
+      }
+
+      if (!(await fileExists(selectedPath))) {
+        sendJson(response, 404, { ok: false, message: 'File not found.' });
+        return;
+      }
+
+      await unlink(selectedPath);
+      sendJson(response, 200, {
+        ok: true,
+        fileName: basename(selectedPath),
+        path: origin === 'tree' && fileTreeRoot ? relative(fileTreeRoot, selectedPath).replaceAll('\\', '/') : selectedPath,
+        rootName: fileTreeRoot ? (workspaceRoot ? getVelDocEditorRootName(workspaceRoot) : basename(fileTreeRoot)) : '',
+        workspaceRoot,
+        rootPath: fileTreeRoot,
+        ...(fileTreeRoot ? await readFileTreePayload(fileTreeRoot) : { tree: [], apiPaths: [], specFiles: [] }),
       });
       return;
     }
@@ -901,7 +1319,7 @@ const server = createServer(async (request, response) => {
       const markdown = String(payload.markdown ?? '');
       const outputDir = safeOutputDir(payload.saveDir);
       const preventOverwrite = requestUrl.pathname === '/api/save-new';
-      const fileTreeRoot = sessionState.fileTreeRoot;
+      const { fileTreeRoot, workspaceRoot } = sessionState;
 
       if (!outputDir) {
         sendJson(response, 400, { ok: false, message: 'Invalid save directory.' });
@@ -931,9 +1349,10 @@ const server = createServer(async (request, response) => {
         fileName,
         ...fileMeta,
         absolutePath: outputPath,
-        tree: fileTreeRoot ? await readFileTree(fileTreeRoot) : [],
-        rootName: fileTreeRoot ? basename(fileTreeRoot) : '',
+        rootName: fileTreeRoot ? (workspaceRoot ? getVelDocEditorRootName(workspaceRoot) : basename(fileTreeRoot)) : '',
+        workspaceRoot,
         rootPath: fileTreeRoot,
+        ...(fileTreeRoot ? await readFileTreePayload(fileTreeRoot) : { tree: [], apiPaths: [], specFiles: [] }),
       });
       return;
     }

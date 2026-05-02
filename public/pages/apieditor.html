@@ -26,7 +26,7 @@
     <link rel="apple-touch-icon" href="../assets/images/icon.png?v=20260430-1" />
     <link rel="stylesheet" href="../assets/css/styles.css?v=20260430-view-transition-skeleton-2" />
   </head>
-  <body>
+  <body class="api-editor-page">
     <div class="page-loading-overlay" id="pageLoadingOverlay" hidden>
       <div class="loading-box" role="status" aria-live="polite">
         <span class="loading-spinner" aria-hidden="true"></span>
@@ -45,6 +45,69 @@
         </div>
       </div>
     </div>
+    <div class="help-dialog-overlay" id="helpDialog" role="dialog" aria-modal="true" aria-labelledby="helpDialogTitle" hidden>
+      <div class="help-dialog-box">
+        <div class="help-dialog-head">
+          <h2 id="helpDialogTitle">도우미</h2>
+          <button class="icon-button help-dialog-close" id="helpDialogCloseButton" type="button" aria-label="도우미 닫기">×</button>
+        </div>
+        <div class="help-dialog-body">
+          <div class="help-topic-grid" role="tablist" aria-label="도우미 주제">
+            <button class="help-topic-card active" type="button" role="tab" aria-selected="true" data-help-topic="shortcuts">
+              <strong>단축키</strong>
+              <span>저장과 새 문서</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-help-topic="files">
+              <strong>저장 / 파일 위치</strong>
+              <span>폴더와 파일 흐름</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-help-topic="tree">
+              <strong>문서 구조</strong>
+              <span>왼쪽 파일 구조</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-help-topic="guide">
+              <strong>작성 가이드</strong>
+              <span>메서드와 입력 기준</span>
+            </button>
+          </div>
+          <div class="help-content">
+            <section class="help-section active" data-help-section="shortcuts">
+              <h3>단축키</h3>
+              <dl class="help-shortcut-list">
+                <div><dt>Cmd / Ctrl + S</dt><dd>현재 문서를 저장합니다.</dd></div>
+                <div><dt>Cmd / Ctrl + D</dt><dd>기존 파일 연결 없이 새 문서를 엽니다.</dd></div>
+                <div><dt>Opt / Alt + V</dt><dd>미리보기 패널을 열고 닫습니다.</dd></div>
+                <div><dt>Opt / Alt + R</dt><dd>입력 중인 내용을 처음 상태로 되돌립니다.</dd></div>
+                <div><dt>Esc</dt><dd>열린 메뉴나 팝업을 닫습니다.</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-help-section="files">
+              <h3>저장 / 파일 위치</h3>
+              <p>홈에서 먼저 작업 폴더를 선택해야 문서를 작성하고 저장할 수 있습니다.<br>같은 탭 세션에서는 새로고침해도 선택한 폴더를 다시 복구합니다.</p>
+              <dl class="help-file-list">
+                <div>
+                  <dt>*.md</dt>
+                  <dd>각 문서의 본문 파일입니다.<br>API 명세서는 선택한 폴더의 veldoc/api 안에 Path 기준 파일명으로 생성됩니다.</dd>
+                </div>
+                <div>
+                  <dt>veldoc-auth-policies.json</dt>
+                  <dd>적용 범위별 Role 후보 목록만 저장하는 VelDoc 관리 파일입니다.<br>문서 저장 시 veldoc/api 안에 함께 정리됩니다.</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="help-section" data-help-section="tree">
+              <h3>문서 구조</h3>
+              <p>왼쪽 문서 구조는 Markdown 문서의 Path와 Method를 기준으로 묶습니다.<br>같은 그룹 안에서 루트 API인 <strong>/</strong> 항목은 항상 위쪽에 배치됩니다.</p>
+            </section>
+            <section class="help-section" data-help-section="guide">
+              <h3>작성 가이드</h3>
+              <p>GET은 조회, POST는 생성, PUT은 전체 수정, PATCH는 일부 수정, DELETE는 삭제에 사용합니다.<br>POST, PUT, PATCH는 Body 입력을 함께 사용합니다.</p>
+              <p>Headers 표에는 API 계약에 필요한 값만 작성합니다.<br>자주 쓰는 헤더는 Headers 표 위 버튼으로 추가할 수 있습니다.<br>인증이 필요한 경우 Authorization은 인증 방식에 맞춰 자동으로 생성됩니다.<br>Body를 사용하는 메서드는 Content-Type이 자동으로 생성됩니다.<br>Accept는 기본값으로 */*를 사용합니다.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
     <button class="menu-backdrop" id="menuBackdrop" type="button" aria-label="메뉴 닫기" hidden></button>
     <button class="file-panel-backdrop" id="filePanelBackdrop" type="button" aria-label="파일 패널 닫기" hidden></button>
@@ -57,7 +120,6 @@
             <button class="button secondary" id="folderViewerButton" type="button" aria-pressed="false">뷰어</button>
           </div>
         </div>
-        <div class="file-tree-root" id="fileTreeRoot">폴더를 선택하세요.</div>
         <nav class="file-tree" id="fileTree" aria-label="명세서 파일 목록">
           <p class="file-tree-empty">표시할 파일이 없습니다.</p>
         </nav>
@@ -105,32 +167,15 @@
               type="button"
               aria-controls="previewPanel"
               aria-expanded="false"
+              data-tooltip="미리보기 (⌥/Alt + V)"
             >
               미리보기
             </button>
-            <button class="button secondary" id="resetButton" type="button">초기화</button>
-            <button class="button secondary" id="newDocumentButton" type="button">새문서</button>
-            <div class="split-button" id="openSplitButton">
-              <button class="button secondary split-main" id="openButton" type="button">열기</button>
-              <button
-                class="button secondary split-arrow"
-                id="openMenuButton"
-                type="button"
-                aria-label="열기 메뉴"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                aria-controls="openDropdown"
-              >
-                ▾
-              </button>
-              <div class="split-menu" id="openDropdown" role="menu" hidden>
-                <button class="split-menu-item" type="button" role="menuitem" data-open-action="folder">폴더 열기</button>
-                <button class="split-menu-item" type="button" role="menuitem" data-open-action="file">파일 열기</button>
-              </div>
-            </div>
-            <input id="openFileInput" type="file" accept=".md,text/markdown,text/plain" hidden />
+            <button class="button secondary" id="resetButton" type="button" data-tooltip="초기화 (⌥/Alt + R)">초기화</button>
+            <button class="button secondary" id="newDocumentButton" type="button" data-tooltip="새문서 (⌘/Ctrl + D)">새문서</button>
+            <button class="button danger" id="deleteDocumentButton" type="button" data-tooltip="현재 문서 삭제">삭제</button>
             <div class="split-button" id="saveSplitButton">
-              <button class="button primary split-main" id="saveButton" type="button">저장</button>
+              <button class="button primary split-main" id="saveButton" type="button" data-tooltip="저장 (⌘/Ctrl + S)">저장</button>
               <button
                 class="button primary split-arrow"
                 id="saveMenuButton"
@@ -147,6 +192,7 @@
                 <button class="split-menu-item" id="saveNewButton" type="button" role="menuitem" data-save-action="new">새 파일 저장</button>
               </div>
             </div>
+            <button class="help-button" id="helpButton" type="button" aria-label="도우미 열기" aria-haspopup="dialog" aria-expanded="false" aria-controls="helpDialog">?</button>
           </div>
         </header>
 
@@ -228,7 +274,7 @@
         </div>
 
         <form id="specForm" class="form-grid" autocomplete="off">
-          <section class="panel span-2 file-location-panel">
+          <section class="panel span-2 file-location-panel" hidden>
             <div class="panel-head">
               <h2>파일 위치</h2>
             </div>
@@ -248,15 +294,38 @@
               <span class="badge">Required</span>
             </div>
             <div class="field-grid">
-              <label class="field">
+              <label class="field wide">
                 <span>API 이름</span>
                 <input name="apiName" type="text" placeholder="오늘 근태 조회" />
               </label>
-              <div class="field">
+              <div class="field wide method-field">
                 <span>Method</span>
-                <div class="check-row wrap">
-                  <label><input name="method" type="radio" value="GET" /> GET</label>
-                  <label><input name="method" type="radio" value="POST" checked /> POST</label>
+                <div class="method-picker-grid" role="radiogroup" aria-label="HTTP Method">
+                  <label class="method-picker-card method-picker-get">
+                    <input name="method" type="radio" value="GET" />
+                    <span class="method-picker-name">GET</span>
+                    <span class="method-picker-desc">조회</span>
+                  </label>
+                  <label class="method-picker-card method-picker-post">
+                    <input name="method" type="radio" value="POST" checked />
+                    <span class="method-picker-name">POST</span>
+                    <span class="method-picker-desc">생성</span>
+                  </label>
+                  <label class="method-picker-card method-picker-put">
+                    <input name="method" type="radio" value="PUT" />
+                    <span class="method-picker-name">PUT</span>
+                    <span class="method-picker-desc">전체 수정</span>
+                  </label>
+                  <label class="method-picker-card method-picker-patch">
+                    <input name="method" type="radio" value="PATCH" />
+                    <span class="method-picker-name">PATCH</span>
+                    <span class="method-picker-desc">일부 수정</span>
+                  </label>
+                  <label class="method-picker-card method-picker-delete">
+                    <input name="method" type="radio" value="DELETE" />
+                    <span class="method-picker-name">DELETE</span>
+                    <span class="method-picker-desc">삭제</span>
+                  </label>
                 </div>
               </div>
               <div class="field wide">
@@ -279,21 +348,13 @@
                     <input name="pathVersion" type="text" value="/v1" placeholder="/v1" />
                   </label>
                   <label class="field">
-                    <span>스웨거 태그</span>
+                    <span>하분류</span>
                     <input name="pathSwaggerTag" type="text" placeholder="/attendance" />
                   </label>
                   <label class="field">
                     <span>동작</span>
                     <input name="pathAction" type="text" placeholder="/today/date" />
                   </label>
-                </div>
-              </div>
-              <div class="field wide">
-                <span>사용처</span>
-                <div class="check-row">
-                  <label><input name="clients" type="checkbox" value="공통" /> 공통</label>
-                  <label><input name="clients" type="checkbox" value="Flutter" /> Flutter</label>
-                  <label><input name="clients" type="checkbox" value="Admin Web" /> Admin Web</label>
                 </div>
               </div>
               <label class="field wide">
@@ -308,26 +369,81 @@
               <h2>인증 / 권한</h2>
             </div>
             <div class="field-grid single">
-              <div class="field">
-                <span>인증 필요 여부</span>
-                <input name="authRequired" type="hidden" value="필요" />
-                <button class="toggle-button form-toggle active" id="authRequiredToggle" type="button" aria-pressed="true">필요</button>
-              </div>
-              <div class="auth-details" id="authDetails">
+              <div class="auth-top-grid" id="authTopGrid">
                 <div class="field">
-                  <span>인증 방식</span>
-                  <div class="check-row wrap">
-                    <label><input name="authScheme" type="radio" value="JWT Bearer" checked /> JWT Bearer</label>
-                    <label><input name="authScheme" type="radio" value="OAuth 2.0" /> OAuth 2.0</label>
-                    <label><input name="authScheme" type="radio" value="API Key" /> API Key</label>
+                  <span>인증 필요 여부</span>
+                  <input name="authRequired" type="hidden" value="필요" />
+                  <button class="toggle-button form-toggle active" id="authRequiredToggle" type="button" aria-pressed="true">필요</button>
+                </div>
+                <div class="field auth-policy-scope-field" id="authPolicyScopeField">
+                  <span>적용 범위</span>
+                  <div class="auth-policy-scope-grid" id="authPolicyScopeGrid" role="radiogroup" aria-label="인증 권한 적용 범위">
+                    <label class="auth-policy-scope-card" data-auth-policy-scope-card="root">
+                      <input name="authPolicyScope" type="radio" value="root" />
+                      <span class="auth-policy-scope-name">주소</span>
+                      <span class="auth-policy-scope-path" data-auth-policy-scope-path="root">/</span>
+                    </label>
+                    <label class="auth-policy-scope-card" data-auth-policy-scope-card="base">
+                      <input name="authPolicyScope" type="radio" value="base" checked />
+                      <span class="auth-policy-scope-name">대분류</span>
+                      <span class="auth-policy-scope-path" data-auth-policy-scope-path="base">/api</span>
+                    </label>
+                    <label class="auth-policy-scope-card" data-auth-policy-scope-card="middle">
+                      <input name="authPolicyScope" type="radio" value="middle" />
+                      <span class="auth-policy-scope-name">중분류</span>
+                      <span class="auth-policy-scope-path" data-auth-policy-scope-path="middle">/api/v1</span>
+                    </label>
+                    <label class="auth-policy-scope-card" data-auth-policy-scope-card="subCategory">
+                      <input name="authPolicyScope" type="radio" value="subCategory" />
+                      <span class="auth-policy-scope-name">하분류</span>
+                      <span class="auth-policy-scope-path" data-auth-policy-scope-path="subCategory">/</span>
+                    </label>
+                    <label class="auth-policy-scope-card" data-auth-policy-scope-card="action">
+                      <input name="authPolicyScope" type="radio" value="action" />
+                      <span class="auth-policy-scope-name">동작</span>
+                      <span class="auth-policy-scope-path" data-auth-policy-scope-path="action">/</span>
+                    </label>
                   </div>
                 </div>
-                <div class="field">
+              </div>
+              <div class="auth-details" id="authDetails">
+                <div class="field auth-scheme-field">
+                  <span>인증 방식</span>
+                  <div class="auth-scheme-grid" role="radiogroup" aria-label="인증 방식">
+                    <label class="auth-scheme-card">
+                      <input name="authScheme" type="radio" value="JWT Bearer" checked />
+                      <span class="auth-scheme-name">JWT Bearer</span>
+                      <span class="auth-scheme-desc">Access Token</span>
+                    </label>
+                    <label class="auth-scheme-card">
+                      <input name="authScheme" type="radio" value="API Key" />
+                      <span class="auth-scheme-name">API Key</span>
+                      <span class="auth-scheme-desc">Header Key</span>
+                    </label>
+                    <label class="auth-scheme-card">
+                      <input name="authScheme" type="radio" value="OAuth 2.0" />
+                      <span class="auth-scheme-name">OAuth 2.0</span>
+                      <span class="auth-scheme-desc">권한 위임</span>
+                    </label>
+                    <label class="auth-scheme-card">
+                      <input name="authScheme" type="radio" value="Cookie Session" />
+                      <span class="auth-scheme-name">Cookie Session</span>
+                      <span class="auth-scheme-desc">Web Session</span>
+                    </label>
+                    <label class="auth-scheme-card auth-scheme-custom-card">
+                      <input name="authScheme" type="radio" value="Custom" />
+                      <span class="auth-scheme-name">Custom</span>
+                      <input class="auth-scheme-custom-input" id="authSchemeCustomInput" name="authSchemeCustom" type="text" placeholder="예: HMAC Signature" />
+                    </label>
+                  </div>
+                </div>
+                <div class="field auth-role-field">
                   <span>접근 가능 Role</span>
-                  <div class="check-row wrap">
-                    <label><input name="roles" type="checkbox" value="employee" /> employee</label>
-                    <label><input name="roles" type="checkbox" value="manager" /> manager</label>
-                    <label><input name="roles" type="checkbox" value="admin" /> admin</label>
+                  <div class="auth-role-grid" id="authRoleGrid">
+                    <div class="auth-role-add-card" id="authRoleAddCard">
+                      <input class="auth-role-input" id="authRoleInput" type="text" placeholder="role 입력" />
+                      <button class="auth-role-add-button" id="authRoleAddButton" type="button" aria-label="Role 추가">+</button>
+                    </div>
                   </div>
                 </div>
                 <label class="field">
@@ -342,6 +458,16 @@
             <div class="panel-head">
               <h2>Headers</h2>
               <button class="mini-button" data-add-row="headers" type="button">추가</button>
+            </div>
+            <div class="header-preset-bar" aria-label="헤더 프리셋">
+              <button class="header-preset-button" data-header-preset="Authorization" type="button">Authorization</button>
+              <button class="header-preset-button" data-header-preset="Cookie" type="button">Cookie</button>
+              <button class="header-preset-button" data-header-preset="Content-Type" type="button">Content-Type</button>
+              <button class="header-preset-button" data-header-preset="X-CSRF-Token" type="button">X-CSRF-Token</button>
+              <button class="header-preset-button" data-header-preset="Idempotency-Key" type="button">Idempotency-Key</button>
+              <button class="header-preset-button" data-header-preset="X-Request-Id" type="button">X-Request-Id</button>
+              <button class="header-preset-button" data-header-preset="Origin" type="button">Origin</button>
+              <button class="header-preset-button" data-header-preset="User-Agent" type="button">User-Agent</button>
             </div>
             <div class="rows" id="headersRows"></div>
           </section>
@@ -385,7 +511,7 @@
             <label class="field">
               <span>Body JSON 미리보기</span>
               <textarea class="code-input json-preview-textarea" name="bodyJson" rows="10" spellcheck="false" readonly placeholder="필드를 추가하면 JSON이 자동 생성됩니다."></textarea>
-              <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다. 축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
+              <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다.<br>축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
             </label>
             <div class="rows top-gap" id="bodyFieldsRows"></div>
           </section>
@@ -408,7 +534,7 @@
               <label class="field wide">
                 <span>Response JSON 미리보기</span>
                 <textarea class="code-input json-preview-textarea success-json-preview-textarea" name="successJson" rows="4" data-min-rows="4" data-max-rows="12" spellcheck="false" readonly placeholder="필드를 추가하면 JSON이 자동 생성됩니다."></textarea>
-                <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다. 축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
+                <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다.<br>축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
               </label>
             </div>
             <div class="rows top-gap" id="responseFieldsRows"></div>
@@ -419,52 +545,17 @@
               <h2>Error Response</h2>
               <button class="mini-button" data-add-row="errors" type="button">추가</button>
             </div>
+            <div class="error-preset-bar" aria-label="Error Response 프리셋">
+              <button class="error-preset-button" data-error-preset="400:BAD_REQUEST" type="button">400 BAD_REQUEST</button>
+              <button class="error-preset-button" data-error-preset="401:UNAUTHORIZED" type="button">401 UNAUTHORIZED</button>
+              <button class="error-preset-button" data-error-preset="403:FORBIDDEN" type="button">403 FORBIDDEN</button>
+              <button class="error-preset-button" data-error-preset="404:NOT_FOUND" type="button">404 NOT_FOUND</button>
+              <button class="error-preset-button" data-error-preset="409:CONFLICT" type="button">409 CONFLICT</button>
+              <button class="error-preset-button" data-error-preset="500:INTERNAL_SERVER_ERROR" type="button">500 INTERNAL_SERVER_ERROR</button>
+            </div>
             <div class="rows" id="errorsRows"></div>
           </section>
 
-          <section class="panel business-panel">
-            <div class="panel-head">
-              <h2>비즈니스 규칙</h2>
-            </div>
-            <label class="field">
-              <span>한 줄에 하나씩 작성</span>
-              <textarea class="textarea-5-20" name="businessRules" rows="5" placeholder="날짜/시간은 KST 기준으로 처리한다.&#10;일반 사용자는 본인 데이터만 조회할 수 있다."></textarea>
-            </label>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head">
-              <h2>목록 / 페이지네이션</h2>
-            </div>
-            <div class="field-grid single">
-              <label class="field">
-                <span>페이지 방식</span>
-                <input name="paginationType" type="text" placeholder="page/size 또는 cursor/limit" />
-              </label>
-              <label class="field">
-                <span>기본 정렬</span>
-                <input name="defaultSort" type="text" placeholder="createdAt desc" />
-              </label>
-              <label class="field">
-                <span>최대 조회 개수</span>
-                <input name="maxItems" type="text" placeholder="100" />
-              </label>
-              <label class="field">
-                <span>검색 / 필터 조건</span>
-                <textarea class="textarea-3-10" name="filters" rows="3" placeholder="이름, 사번, 부서, 근태 상태"></textarea>
-              </label>
-            </div>
-          </section>
-
-          <section class="panel span-2">
-            <div class="panel-head">
-              <h2>프론트엔드 처리 메모</h2>
-            </div>
-            <label class="field">
-              <span>한 줄에 하나씩 작성</span>
-              <textarea class="textarea-5-20" name="frontendNotes" rows="5" placeholder="빈 목록 화면 필요&#10;성공 후 공지 상세 화면으로 이동"></textarea>
-            </label>
-          </section>
         </form>
 
         <section class="spec-viewer" id="specViewer" aria-label="API 명세서 뷰어" hidden>
