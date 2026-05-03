@@ -26,9 +26,6 @@ temp/
 *.swp
 veldoc/
 
-# Local/generated document output
-api_spec_docs/
-
 # Local-only design guideline
 documents/DesignGuideline.html
 documents/git-flow.md

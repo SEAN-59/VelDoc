@@ -17,8 +17,6 @@ const sessionCookieName = 'veldoc_session';
 const sessions = new Map();
 const basicApiMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const authPolicyFileName = 'veldoc-auth-policies.json';
-const legacyAuthPolicyDirectoryName = '.veldoc';
-const legacyAuthPolicyFileName = 'auth-policies.json';
 const authPolicyVersion = 2;
 const veldocWorkspaceDirectoryName = 'veldoc';
 const apiEditorDirectoryName = 'api';
@@ -308,7 +306,7 @@ const getMarkdownTableValue = (markdown, key) => {
 };
 
 const getSubCategoryTableValue = (markdown) =>
-  getMarkdownTableValue(markdown, '하분류') || getMarkdownTableValue(markdown, 'Swagger Tag');
+  getMarkdownTableValue(markdown, '소분류');
 
 const getMarkdownSection = (markdown, title) => {
   const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -458,8 +456,8 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
   }
 
   const segments = splitApiPath(pathValue);
-  const rawSwaggerTag = segments[2] || getSubCategoryTableValue(basicSection);
-  const swaggerTag = isEmptySpecGroupValue(rawSwaggerTag) ? '/' : rawSwaggerTag;
+  const rawSubCategory = segments[2] || getSubCategoryTableValue(basicSection);
+  const subCategory = isEmptySpecGroupValue(rawSubCategory) ? '/' : rawSubCategory;
   const normalizedMethod = normalizeBasicApiMethod(getMarkdownTableValue(basicSection, 'Method'));
 
   return {
@@ -471,7 +469,7 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
     commonPath: segments[0] || '/',
     versionPath: segments[1] || '/',
     purpose: getMarkdownTableValue(basicSection, '목적') || '미정',
-    swaggerTag,
+    subCategory,
     authRequired: getMarkdownTableValue(authSection, '인증 필요 여부') || '미정',
     authScheme: getMarkdownTableValue(authSection, '인증 방식') || '미정',
     authPolicyScope: getMarkdownTableValue(authSection, '적용 범위') || '미정',
@@ -570,17 +568,17 @@ const getSpecGrouping = async (filePath) => {
 
     const method = cleanMarkdownValue(getMarkdownTableValue(basicSection, 'Method')).toUpperCase();
     const segments = splitApiPath(pathValue);
-    const swaggerTagSegments = splitApiPath(getSubCategoryTableValue(basicSection));
+    const subCategorySegments = splitApiPath(getSubCategoryTableValue(basicSection));
     const common = segments[0] || '/';
     const version = segments[1] || '/';
-    const rawSwaggerTag = segments[2] || swaggerTagSegments[0] || '';
-    const hasSwaggerTag = !isEmptySpecGroupValue(rawSwaggerTag);
-    const swaggerTag = hasSwaggerTag ? rawSwaggerTag : '';
+    const rawSubCategory = segments[2] || subCategorySegments[0] || '';
+    const hasSubCategory = !isEmptySpecGroupValue(rawSubCategory);
+    const subCategory = hasSubCategory ? rawSubCategory : '';
     const actionSegments = segments.slice(3);
 
     return {
       apiPath: normalizeSpecApiPath(pathValue),
-      groups: [common, version, swaggerTag].filter(Boolean),
+      groups: [common, version, subCategory].filter(Boolean),
       label: actionSegments.length > 0 ? `/${actionSegments.join('/')}` : '/',
       method,
     };
@@ -771,22 +769,13 @@ const normalizeAuthPolicies = (source) => {
 const getAuthPolicyFilePath = (fileTreeRoot) =>
   resolve(fileTreeRoot, authPolicyFileName);
 
-const getLegacyAuthPolicyFilePath = (fileTreeRoot) =>
-  resolve(fileTreeRoot, legacyAuthPolicyDirectoryName, legacyAuthPolicyFileName);
-
 const readAuthPolicies = async (fileTreeRoot) => {
   try {
     const policyFilePath = getAuthPolicyFilePath(fileTreeRoot);
     if (!isInside(fileTreeRoot, policyFilePath)) return createDefaultAuthPolicies();
     return normalizeAuthPolicies(JSON.parse(await readFile(policyFilePath, 'utf8')));
   } catch {
-    try {
-      const legacyPolicyFilePath = getLegacyAuthPolicyFilePath(fileTreeRoot);
-      if (!isInside(fileTreeRoot, legacyPolicyFilePath)) return createDefaultAuthPolicies();
-      return normalizeAuthPolicies(JSON.parse(await readFile(legacyPolicyFilePath, 'utf8')));
-    } catch {
-      return createDefaultAuthPolicies();
-    }
+    return createDefaultAuthPolicies();
   }
 };
 

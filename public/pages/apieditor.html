@@ -273,6 +273,15 @@
           </div>
         </div>
 
+        <section class="editor-empty-state" id="documentEmptyState" aria-live="polite" hidden>
+          <div class="editor-empty-icon" aria-hidden="true">
+            <img src="../assets/images/bordercoli.png" alt="" />
+          </div>
+          <p class="editor-empty-title">선택된 문서가 없습니다</p>
+          <p class="editor-empty-desc">파일 구조에서 문서를 선택하거나 새문서를 눌러 API 명세서 작성을 시작하세요.</p>
+          <button class="button primary editor-empty-action" id="emptyNewDocumentButton" type="button">새문서</button>
+        </section>
+
         <form id="specForm" class="form-grid" autocomplete="off">
           <section class="panel span-2 file-location-panel" hidden>
             <div class="panel-head">
@@ -348,8 +357,8 @@
                     <input name="pathVersion" type="text" value="/v1" placeholder="/v1" />
                   </label>
                   <label class="field">
-                    <span>하분류</span>
-                    <input name="pathSwaggerTag" type="text" placeholder="/attendance" />
+                    <span>소분류</span>
+                    <input name="pathSubCategory" type="text" placeholder="/attendance" />
                   </label>
                   <label class="field">
                     <span>동작</span>
@@ -395,7 +404,7 @@
                     </label>
                     <label class="auth-policy-scope-card" data-auth-policy-scope-card="subCategory">
                       <input name="authPolicyScope" type="radio" value="subCategory" />
-                      <span class="auth-policy-scope-name">하분류</span>
+                      <span class="auth-policy-scope-name">소분류</span>
                       <span class="auth-policy-scope-path" data-auth-policy-scope-path="subCategory">/</span>
                     </label>
                     <label class="auth-policy-scope-card" data-auth-policy-scope-card="action">
@@ -597,6 +606,6 @@
       </aside>
     </main>
 
-    <script src="../assets/js/editor.js?v=20260430-split-menu"></script>
+    <script type="module" src="../assets/js/api_editor.js?v=20260502-module-split"></script>
   </body>
 </html>

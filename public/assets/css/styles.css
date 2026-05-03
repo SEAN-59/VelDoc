@@ -428,6 +428,10 @@ body.home-page .help-topic-card.active {
   min-width: 0;
 }
 
+.workspace {
+  padding-bottom: 104px;
+}
+
 .topbar,
 .preview-head {
   align-items: center;
@@ -1800,6 +1804,59 @@ body.resizing-side-menu .side-menu-resizer::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.editor-empty-state {
+  align-items: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  justify-content: center;
+  min-height: calc(100vh - 132px);
+  padding: 48px 32px;
+  text-align: center;
+}
+
+.editor-empty-icon {
+  align-items: center;
+  background: var(--color-bg-tertiary);
+  border-radius: 16px;
+  display: flex;
+  height: 72px;
+  justify-content: center;
+  margin-bottom: 20px;
+  overflow: hidden;
+  width: 72px;
+}
+
+.editor-empty-icon img {
+  display: block;
+  height: 64px;
+  object-fit: contain;
+  width: 64px;
+}
+
+.editor-empty-title {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.editor-empty-desc {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin: 0 0 24px;
+  max-width: 340px;
+}
+
+.editor-empty-action {
+  min-width: 112px;
+}
+
 .form-grid.is-file-location-unset > .panel {
   display: none;
 }
@@ -3019,53 +3076,75 @@ textarea[readonly] {
 }
 
 .viewer-tabs {
-  --tab-count: 1;
-  --tab-index: 0;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  display: grid;
-  grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
-  min-height: 38px;
-  overflow: hidden;
-  padding: 2px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: 0;
+  min-height: 40px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px;
   position: relative;
+  scrollbar-width: none;
+  width: 100%;
+}
+
+.viewer-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .viewer-tab-indicator {
   background: var(--color-bg);
   border: 1px solid var(--veldoc-primary);
-  border-radius: var(--radius-sm);
-  bottom: 2px;
-  box-shadow: var(--shadow-xs);
-  left: 2px;
+  border-radius: var(--radius-md);
+  bottom: 4px;
+  box-shadow: var(--shadow-sm);
+  left: 4px;
   pointer-events: none;
   position: absolute;
-  top: 2px;
-  transform: translateX(calc(var(--tab-index) * 100%));
-  transition: transform 180ms ease;
-  width: calc((100% - 4px) / var(--tab-count));
+  top: 4px;
+  width: 0;
   z-index: 0;
+}
+
+.viewer-tab-indicator.is-ready {
+  transition:
+    left 220ms cubic-bezier(.4, 0, .2, 1),
+    width 220ms cubic-bezier(.4, 0, .2, 1);
 }
 
 .viewer-tab {
   background: transparent;
   border: 0;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 900;
+  flex: 1 0 max(82px, calc(100% / var(--tab-count, 1)));
   min-width: 0;
   overflow: hidden;
-  padding: 0 10px;
+  padding: 8px clamp(10px, 2vw, 16px);
   position: relative;
   text-overflow: ellipsis;
+  transition:
+    color 150ms ease,
+    transform 80ms ease;
   white-space: nowrap;
   z-index: 1;
 }
 
+.viewer-tab:hover:not([aria-selected="true"]) {
+  color: var(--color-text-primary);
+}
+
 .viewer-tab[aria-selected="true"] {
   color: var(--veldoc-primary-text);
+}
+
+.viewer-tab:active {
+  transform: scale(0.97);
 }
 
 .viewer-tab:focus-visible,
