@@ -258,18 +258,6 @@ export const createControllerRuntime = (ctx) => {
   };
 
   const bindErrorStatusControls = () => {
-    const syncErrorMetaFieldExample = (key, nextValue, previousValue) => {
-      const response = getActiveErrorResponse();
-      const row = (response.fields || []).find((item) =>
-        !String(item.parentKey ?? '').trim() && String(item.key ?? '').trim() === key,
-      );
-      if (!row) return;
-      const currentExample = String(row.example ?? '').trim();
-      if (currentExample && currentExample !== String(previousValue ?? '').trim()) return;
-      row.example = nextValue;
-      renderRows('errorFields');
-    };
-
     form.elements.errorStatus?.addEventListener('focus', () => {
       ctx.errorStatusPreviousValue = getActiveErrorResponse().status || '400';
     });
@@ -300,16 +288,11 @@ export const createControllerRuntime = (ctx) => {
 
     form.elements.errorCode?.addEventListener('input', () => {
       const response = getActiveErrorResponse();
-      const previousValue = response.code;
       response.code = form.elements.errorCode.value;
-      syncErrorMetaFieldExample('code', response.code, previousValue);
       renderErrorStatusTabs();
     });
     form.elements.errorMessage?.addEventListener('input', () => {
-      const response = getActiveErrorResponse();
-      const previousValue = response.message;
-      response.message = form.elements.errorMessage.value;
-      syncErrorMetaFieldExample('message', response.message, previousValue);
+      getActiveErrorResponse().message = form.elements.errorMessage.value;
     });
     form.elements.errorCondition?.addEventListener('input', () => {
       getActiveErrorResponse().condition = form.elements.errorCondition.value;

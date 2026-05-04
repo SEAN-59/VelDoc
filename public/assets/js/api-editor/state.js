@@ -9,14 +9,25 @@ export const createDefaultRows = () => ({
   errors: [],
 });
 
-export const createDefaultSuccessResponses = () => [{ status: '200', fields: [] }];
+export const createDefaultSuccessFields = () => [
+  {
+    parentKey: '',
+    key: 'requestId',
+    type: 'string',
+    nullable: 'N',
+    example: 'req_123456',
+    description: '요청 추적 ID',
+  },
+];
+
+export const createDefaultSuccessResponses = () => [{ status: '200', fields: createDefaultSuccessFields() }];
 
 export const createDefaultErrorFields = (preset = {}) => [
   {
     parentKey: '',
     key: 'requestId',
     type: 'string',
-    nullable: 'Y',
+    nullable: 'N',
     example: 'req_123456',
     description: '요청 추적 ID',
   },
@@ -133,6 +144,7 @@ export const createStateRuntime = ({
   const defaultErrorResponses = createDefaultErrorResponses(ERROR_RESPONSE_PRESETS);
 
   return {
+    createDefaultSuccessFields,
     createDefaultErrorFields,
     defaultRows,
     defaultSuccessResponses,

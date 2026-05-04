@@ -251,7 +251,7 @@ export const createSuccessResponseRuntime = (ctx) => {
       showWarningToast('상태 추가 실패', '추가할 수 있는 2xx 상태 코드가 없습니다.');
       return;
     }
-    responses.push(createSuccessResponse({ status: nextStatus, fields: [] }));
+    responses.push(createSuccessResponse({ status: nextStatus, fields: ctx.createDefaultSuccessFields?.() || [] }));
     state.activeSuccessResponseIndex = responses.length - 1;
     clearSuccessStatusError();
     renderSuccessStatusTabs();
