@@ -27,6 +27,8 @@ export const normalizeAuthScheme = (
 
 export const normalizeHeaderKey = (value) => String(value ?? '').trim().toLowerCase();
 
+export const isAuthorizationHeaderRow = (row) => normalizeHeaderKey(row?.key) === 'authorization';
+
 export const buildAuthorizationHeaderValue = (authScheme) => {
   const scheme = String(authScheme ?? '').trim();
   if (scheme === 'JWT Bearer' || scheme === 'OAuth 2.0') return 'Bearer {token}';
@@ -67,10 +69,10 @@ export const createHeadersRuntime = (ctx) => {
   const getHeaderPreset = (key) =>
     ctx.HEADER_PRESETS.find((preset) => normalizeHeaderKey(preset.key) === normalizeHeaderKey(key));
 
-  const buildAutomaticHeaderRows = ({ authRequired, authScheme, method }) => {
+  const buildAutomaticHeaderRows = ({ authRequired, authScheme, method, includeAuthorization = true }) => {
     const rows = [];
 
-    if (authRequired === '필요') {
+    if (authRequired === '필요' && includeAuthorization) {
       rows.push({
         key: 'Authorization',
         value: buildAuthorizationHeaderValue(authScheme),
@@ -149,24 +151,33 @@ export const createHeadersRuntime = (ctx) => {
     isAutomaticHeaderRow(a) === isAutomaticHeaderRow(b);
 
   const isManagedAutomaticHeaderRow = (row) =>
-    isAutomaticHeaderRow(row) || isAutomaticHeaderCandidateRow(row);
+    isAutomaticHeaderRow(row) || (!isAuthorizationHeaderRow(row) && isAutomaticHeaderCandidateRow(row));
 
   const buildHeaderRowsForMarkdown = ({ authRequired, authScheme, method }) => {
-    const automaticRows = buildAutomaticHeaderRows({ authRequired, authScheme, method });
-    const manualRows = ctx.getFieldRows('headers').filter((row) => isFilledHeaderRow(row) && !isManagedAutomaticHeaderRow(row));
+    const existingRows = ctx.getFieldRows('headers');
+    const hasAuthorizationHeader = existingRows.some(isAuthorizationHeaderRow);
+    const automaticRows = buildAutomaticHeaderRows({
+      authRequired,
+      authScheme,
+      method,
+      includeAuthorization: hasAuthorizationHeader,
+    });
+    const manualRows = existingRows.filter((row) => isFilledHeaderRow(row) && !isManagedAutomaticHeaderRow(row));
     const manualHeaderKeys = new Set(manualRows.map((row) => normalizeHeaderKey(row.key)).filter(Boolean));
     const missingAutomaticRows = automaticRows.filter((row) => !manualHeaderKeys.has(normalizeHeaderKey(row.key)));
 
     return [...missingAutomaticRows, ...manualRows];
   };
 
-  const syncHeaderRowsWithControls = ({ render = false } = {}) => {
+  const syncHeaderRowsWithControls = ({ render = false, allowAuthorization = false } = {}) => {
+    const existingRows = state.rows.headers || [];
+    const hasAutoAuthorizationHeader = existingRows.some((row) => isAutomaticHeaderRow(row) && isAuthorizationHeaderRow(row));
     const automaticRows = buildAutomaticHeaderRows({
       authRequired: ctx.isAuthRequired() ? '필요' : '불필요',
       authScheme: getEffectiveAuthScheme(),
       method: ctx.input('method') || 'POST',
+      includeAuthorization: allowAuthorization || hasAutoAuthorizationHeader,
     }).map(markAutoHeaderRow);
-    const existingRows = state.rows.headers || [];
     const manualRows = existingRows.filter((row) => isFilledHeaderRow(row) && !isManagedAutomaticHeaderRow(row));
     const manualHeaderKeys = new Set(manualRows.map((row) => normalizeHeaderKey(row.key)).filter(Boolean));
     const nextRows = [
@@ -183,8 +194,8 @@ export const createHeadersRuntime = (ctx) => {
     return true;
   };
 
-  const syncHeaderRowsAndRefresh = () => {
-    syncHeaderRowsWithControls({ render: true });
+  const syncHeaderRowsAndRefresh = (options = {}) => {
+    syncHeaderRowsWithControls({ ...options, render: true });
     ctx.refresh();
   };
 
@@ -197,6 +208,7 @@ export const createHeadersRuntime = (ctx) => {
     getAuthSchemeState,
     getEffectiveAuthScheme,
     normalizeHeaderKey,
+    isAuthorizationHeaderRow,
     getHeaderPreset,
     buildAuthorizationHeaderValue,
     buildAutomaticHeaderRows,

@@ -834,7 +834,7 @@ export const createDocumentActionsRuntime = (ctx) => {
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
   renderAuthRoles();
-  syncHeaderRowsWithControls();
+  syncHeaderRowsWithControls({ allowAuthorization: true });
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
   renderActionPathParams();
@@ -867,7 +867,7 @@ export const createDocumentActionsRuntime = (ctx) => {
     scopePath: authPolicyScopeOption.path,
     updateSelectionMemory: false,
   });
-  syncHeaderRowsWithControls();
+  syncHeaderRowsWithControls({ allowAuthorization: true });
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
   renderActionPathParams();

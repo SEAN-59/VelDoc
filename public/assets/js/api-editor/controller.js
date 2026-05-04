@@ -121,8 +121,9 @@ export const createControllerRuntime = (ctx) => {
 
   const bindAuthControls = () => {
     authRequiredToggle?.addEventListener('click', () => {
-      form.elements.authRequired.value = isAuthRequired() ? '불필요' : '필요';
-      syncHeaderRowsAndRefresh();
+      const wasRequired = isAuthRequired();
+      form.elements.authRequired.value = wasRequired ? '불필요' : '필요';
+      syncHeaderRowsAndRefresh({ allowAuthorization: !wasRequired });
     });
     form.querySelectorAll('input[name="method"]').forEach((element) => {
       element.addEventListener('change', () => {
