@@ -4,6 +4,7 @@ export const createTableExamplesRuntime = (ctx) => {
     EXAMPLE_TOUCHED_FIELD,
   } = ctx;
 
+  const getActiveErrorResponse = (...args) => ctx.getActiveErrorResponse(...args);
   const getActiveSuccessResponse = (...args) => ctx.getActiveSuccessResponse(...args);
   const getFieldRows = (...args) => ctx.getFieldRows(...args);
 
@@ -25,7 +26,8 @@ export const createTableExamplesRuntime = (ctx) => {
     parseContainerValue,
     buildJsonFromRows,
     buildBodyJson,
-    buildSuccessJson;
+    buildSuccessJson,
+    buildErrorJson;
 
   ctx.formatJsonBlock = formatJsonBlock = (value) => {
     const trimmed = value.trim();
@@ -240,9 +242,13 @@ export const createTableExamplesRuntime = (ctx) => {
   ctx.buildSuccessJson = buildSuccessJson = (successResponse = getActiveSuccessResponse()) =>
     buildJsonFromRows('responseFields', successResponse.fields || []);
 
+  ctx.buildErrorJson = buildErrorJson = (errorResponse = getActiveErrorResponse()) =>
+    buildJsonFromRows('errorFields', errorResponse.fields || []);
+
   return {
     applyAutoExampleForRow,
     buildBodyJson,
+    buildErrorJson,
     buildJsonFromRows,
     buildSuccessJson,
     ensureArrayObject,

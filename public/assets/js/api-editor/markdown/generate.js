@@ -1,7 +1,7 @@
 export const createMarkdownGenerateRuntime = (ctx) => {
   const table = (...args) => ctx.table(...args);
-  const getFieldRows = (...args) => ctx.getFieldRows(...args);
   const getFieldRowsForMarkdown = (...args) => ctx.getFieldRowsForMarkdown(...args);
+  const formatErrorResponsesMarkdown = (...args) => ctx.formatErrorResponsesMarkdown(...args);
   const formatSuccessResponsesMarkdown = (...args) => ctx.formatSuccessResponsesMarkdown(...args);
 
   let
@@ -114,15 +114,7 @@ ${formatSuccessResponsesMarkdown()}
 
 ## 8. Error Response
 
-${table(
-    [
-      { key: 'status', label: 'Status', alignRight: true },
-      { key: 'code', label: 'Code' },
-      { key: 'message', label: 'Message' },
-      { key: 'condition', label: '발생 상황' },
-    ],
-    getFieldRows('errors'),
-  )}
+${formatErrorResponsesMarkdown()}
   `;
   };
 

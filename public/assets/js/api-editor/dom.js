@@ -84,6 +84,8 @@ export const getEditorDom = () => ({
   successStatusTabs: document.querySelector('#successStatusTabs'),
   addSuccessStatusButton: document.querySelector('#addSuccessStatusButton'),
   successStatusError: document.querySelector('#successStatusError'),
+  errorStatusTabs: document.querySelector('#errorStatusTabs'),
+  addErrorStatusButton: document.querySelector('#addErrorStatusButton'),
   methodPickerGrid: document.querySelector('.method-picker-grid'),
 });
 

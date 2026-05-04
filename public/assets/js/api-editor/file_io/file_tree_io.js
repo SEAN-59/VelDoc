@@ -22,6 +22,7 @@ export const createFileTreeIoRuntime = (ctx) => {
   const normalizeFolderSpecFiles = (...args) => ctx.normalizeFolderSpecFiles(...args);
   const normalizeSaveDir = (...args) => ctx.normalizeSaveDir(...args);
   const parseRowsByHeaders = (...args) => ctx.parseRowsByHeaders(...args);
+  const parseViewerErrorResponsesFromMarkdown = (...args) => ctx.parseViewerErrorResponsesFromMarkdown(...args);
   const parseViewerSuccessResponsesFromMarkdown = (...args) => ctx.parseViewerSuccessResponsesFromMarkdown(...args);
   const refresh = (...args) => ctx.refresh(...args);
   const renderFileTree = (...args) => ctx.renderFileTree(...args);
@@ -125,7 +126,9 @@ export const createFileTreeIoRuntime = (ctx) => {
   const authSection = getMarkdownSection(markdown, '인증 / 권한');
   const bodySectionText = getMarkdownSection(markdown, 'Body');
   const successSection = getMarkdownSection(markdown, 'Success Response');
+  const errorSection = getMarkdownSection(markdown, 'Error Response');
   const successResponses = parseViewerSuccessResponsesFromMarkdown(successSection);
+  const errorResponses = parseViewerErrorResponsesFromMarkdown(errorSection);
   const primarySuccessResponse = successResponses[0] || { status: '200', json: '', fields: [] };
   const pathValue = getMarkdownTableValue(basicSection, 'Path');
 
@@ -188,12 +191,8 @@ export const createFileTreeIoRuntime = (ctx) => {
     ]),
     successJson: primarySuccessResponse.json,
     responseFields: primarySuccessResponse.fields,
-    errors: parseRowsByHeaders(getMarkdownSection(markdown, 'Error Response'), [
-      ['status', 'Status'],
-      ['code', 'Code'],
-      ['message', 'Message'],
-      ['condition', '발생 상황'],
-    ]),
+    errors: errorResponses.map(({ status, code, message, condition }) => ({ status, code, message, condition })),
+    errorResponses,
   };
   };
 

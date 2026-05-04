@@ -9,6 +9,7 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
     startsWithSegments,
   } = ctx;
 
+  const parseErrorResponsesFromMarkdown = (...args) => ctx.parseErrorResponsesFromMarkdown(...args);
   const parseSuccessResponsesFromMarkdown = (...args) => ctx.parseSuccessResponsesFromMarkdown(...args);
 
   let
@@ -140,12 +141,7 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
       ['description', '설명'],
     ]);
     const successResponses = parseSuccessResponsesFromMarkdown(getMarkdownSection(markdown, 'Success Response'));
-    const errors = parseRowsByHeaders(getMarkdownSection(markdown, 'Error Response'), [
-      ['status', 'Status'],
-      ['code', 'Code'],
-      ['message', 'Message'],
-      ['condition', '발생 상황'],
-    ]);
+    const errorResponses = parseErrorResponsesFromMarkdown(getMarkdownSection(markdown, 'Error Response'));
     const normalPathParams = parsedPathParams.filter((row) => row.beforeAction === 'Y' || row.beforeAction === 'N');
     const actionPathParams = parsedPathParams
       .filter((row) => row.key && row.beforeAction !== 'Y' && row.beforeAction !== 'N')
@@ -203,15 +199,19 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
       queryParams: queryParams.map((row) => ({ ...row, required: row.required || 'N' })),
       bodyFields: bodyFields.map((row) => ({ ...row, required: row.required || 'Y' })),
       responseFields: [],
-      errors,
+      errorFields: [],
+      errors: [],
     };
     state.successResponses = successResponses;
     state.activeSuccessResponseIndex = 0;
+    state.errorResponses = errorResponses;
+    state.activeErrorResponseIndex = 0;
     ctx.setFormValue('successStatus', ctx.getActiveSuccessResponse().status || '200');
 
     ctx.syncHeaderRowsWithControls();
     Object.keys(ctx.rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(ctx.renderRows);
     ctx.renderSuccessStatusTabs();
+    ctx.renderErrorStatusTabs();
     ctx.renderActionPathParams();
     ctx.refresh();
   };

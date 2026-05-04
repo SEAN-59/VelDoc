@@ -54,11 +54,14 @@ export const createViewerRuntime = (ctx) => {
     countViewerKeyRows,
     countViewerErrorRows,
     countViewerSuccessResponses,
+    countViewerErrorResponses,
     createSpecChip,
     createSpecCounter,
     getSpecSuccessResponses,
+    getSpecErrorResponses,
     createSpecDetailSection,
     createSpecSuccessResponseDetail,
+    createSpecErrorResponseDetail,
     createSpecCard,
     getViewerTabIndicatorMetrics,
     setViewerTabIndicatorPosition,
@@ -334,6 +337,16 @@ export const createViewerRuntime = (ctx) => {
       countViewerKeyRows(response.fields) > 0,
     ).length;
 
+  ctx.countViewerErrorResponses = countViewerErrorResponses = (responses = []) =>
+    responses.filter((response) =>
+      !isBlankViewerValue(response.status) ||
+      !isBlankViewerValue(response.code) ||
+      !isBlankViewerValue(response.message) ||
+      !isBlankViewerValue(response.condition) ||
+      !isBlankViewerValue(response.json) ||
+      countViewerKeyRows(response.fields) > 0,
+    ).length;
+
   ctx.createSpecChip = createSpecChip = (label, value) => {
     const chip = document.createElement('div');
     chip.className = 'spec-chip';
@@ -362,6 +375,32 @@ export const createViewerRuntime = (ctx) => {
       json: spec.successJson || '',
       fields: Array.isArray(spec.responseFields) ? spec.responseFields : [],
     }];
+  };
+
+  ctx.getSpecErrorResponses = getSpecErrorResponses = (spec) => {
+    if (Array.isArray(spec.errorResponses) && spec.errorResponses.length > 0) {
+      return spec.errorResponses.map((response) => ({
+        status: response.status || '400',
+        code: response.code || '',
+        message: response.message || '',
+        condition: response.condition || '',
+        json: response.json || '',
+        fields: Array.isArray(response.fields) ? response.fields : [],
+      }));
+    }
+
+    if (Array.isArray(spec.errors) && spec.errors.length > 0) {
+      return spec.errors.map((row) => ({
+        status: row.status || '400',
+        code: row.code || '',
+        message: row.message || '',
+        condition: row.condition || '',
+        json: '',
+        fields: [],
+      }));
+    }
+
+    return [];
   };
 
   ctx.createSpecDetailSection = createSpecDetailSection = (title, elements = []) => {
@@ -411,10 +450,48 @@ export const createViewerRuntime = (ctx) => {
     return wrapper;
   };
 
+  ctx.createSpecErrorResponseDetail = createSpecErrorResponseDetail = (response) => {
+    const status = response.status || '400';
+    const fieldCount = countViewerKeyRows(response.fields);
+    const hasJson = !isBlankViewerValue(response.json);
+    const metaTable = createSpecDetailTable('Meta', [
+      ['code', 'Code'],
+      ['message', 'Message'],
+      ['condition', '발생 상황'],
+    ], [response]);
+    const fieldTable = createSpecDetailTable('Fields', [
+      ['parentKey', 'UpKey'],
+      ['key', 'Key'],
+      ['type', 'Type'],
+      ['nullable', 'Nullable'],
+      ['description', '설명'],
+    ], response.fields, { rowFilter: hasViewerKey });
+    const jsonPreview = createSpecJsonPreview('JSON', response.json);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'spec-success-response';
+
+    const head = document.createElement('div');
+    head.className = 'spec-success-response-head';
+    head.append(
+      createTextElement('span', 'spec-success-status', `Status ${status}`),
+      createTextElement('span', 'spec-success-meta', `${viewerValue(response.code, 'ERROR')}${fieldCount ? ` / 필드 ${fieldCount}개` : ''}${hasJson ? ' / JSON' : ''}`),
+    );
+    wrapper.append(head);
+
+    const body = document.createElement('div');
+    body.className = 'spec-success-response-body';
+    [metaTable, fieldTable, jsonPreview].filter(Boolean).forEach((element) => body.append(element));
+    if (body.children.length > 0) wrapper.append(body);
+
+    return wrapper;
+  };
+
   ctx.createSpecCard = createSpecCard = (spec) => {
     const card = document.createElement('article');
     const method = String(spec.method || 'POST').toUpperCase();
     const successResponses = getSpecSuccessResponses(spec);
+    const errorResponses = getSpecErrorResponses(spec);
     card.className = `spec-endpoint-card method-card-${method.toLowerCase()}`;
 
     const top = document.createElement('div');
@@ -455,7 +532,7 @@ export const createViewerRuntime = (ctx) => {
       createSpecCounter('Query', countViewerKeyRows(spec.queryParams)),
       createSpecCounter('Body', countViewerKeyRows(spec.bodyFields)),
       createSpecCounter('Response', countViewerSuccessResponses(successResponses)),
-      createSpecCounter('Errors', countViewerErrorRows(spec.errors)),
+      createSpecCounter('Errors', countViewerErrorResponses(errorResponses) || countViewerErrorRows(spec.errors)),
     );
 
     const detailStack = document.createElement('div');
@@ -492,14 +569,7 @@ export const createViewerRuntime = (ctx) => {
         createSpecJsonPreview('Body JSON', spec.bodyJson),
       ]),
       createSpecDetailSection('Response', successResponses.map(createSpecSuccessResponseDetail)),
-      createSpecDetailSection('Error', [
-        createSpecDetailTable('Error Response', [
-          ['status', 'Status'],
-          ['code', 'Code'],
-          ['message', 'Message'],
-          ['condition', '발생 상황'],
-        ], spec.errors),
-      ]),
+      createSpecDetailSection('Error', errorResponses.map(createSpecErrorResponseDetail)),
     ].filter(Boolean).forEach((element) => detailStack.append(element));
 
     card.append(top, titleBlock, chips, counters);

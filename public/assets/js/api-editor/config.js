@@ -32,6 +32,7 @@ export const AUTO_EXAMPLE_ROW_TYPES = new Set([
   'queryParams',
   'bodyFields',
   'responseFields',
+  'errorFields',
 ]);
 export const ERROR_STATE_CLEAR_DELAY_MS = 1500;
 
@@ -103,6 +104,18 @@ export const rowDefinitions = {
       ['nullable', 'Nullable', 'N'],
       ['example', '예시', ''],
       ['description', '설명', '근태 상태'],
+    ],
+  },
+  errorFields: {
+    id: 'errorFieldsRows',
+    className: 'response-row',
+    fields: [
+      ['parentKey', 'UpKey', ''],
+      ['key', 'Key', 'code'],
+      ['type', 'Type', 'string'],
+      ['nullable', 'Nullable', 'N'],
+      ['example', '예시', 'BAD_REQUEST'],
+      ['description', '설명', '에러 코드'],
     ],
   },
   errors: {

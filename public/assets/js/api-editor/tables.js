@@ -1,4 +1,5 @@
 import { createTableExamplesRuntime } from './tables/examples.js';
+import { createErrorResponseRuntime } from './tables/error_response.js';
 import { createTableRenderRuntime } from './tables/render_rows.js';
 import { createRowActionsRuntime } from './tables/row_actions.js';
 import { createSuccessResponseRuntime } from './tables/success_response.js';
@@ -11,6 +12,7 @@ export const createTablesRuntime = (ctx) => {
   };
 
   attach(createSuccessResponseRuntime(ctx));
+  attach(createErrorResponseRuntime(ctx));
   attach(createTableExamplesRuntime(ctx));
   attach(createRowActionsRuntime(ctx));
   attach(createTableRenderRuntime(ctx));

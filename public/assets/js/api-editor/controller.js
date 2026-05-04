@@ -3,6 +3,7 @@
 export const createControllerRuntime = (ctx) => {
   const {
     CUSTOM_AUTH_SCHEME,
+    addErrorStatusButton,
     addSuccessStatusButton,
     appShell,
     authPolicyScopeGrid,
@@ -40,6 +41,7 @@ export const createControllerRuntime = (ctx) => {
 
   const addAuthRole = (...args) => ctx.addAuthRole(...args);
   const addErrorPreset = (...args) => ctx.addErrorPreset(...args);
+  const addErrorResponse = (...args) => ctx.addErrorResponse(...args);
   const addHeaderPreset = (...args) => ctx.addHeaderPreset(...args);
   const addRow = (...args) => ctx.addRow(...args);
   const addSuccessResponse = (...args) => ctx.addSuccessResponse(...args);
@@ -53,7 +55,9 @@ export const createControllerRuntime = (ctx) => {
   const createNewDocument = (...args) => ctx.createNewDocument(...args);
   const deleteCurrentDocument = (...args) => ctx.deleteCurrentDocument(...args);
   const getActiveSuccessResponse = (...args) => ctx.getActiveSuccessResponse(...args);
+  const getActiveErrorResponse = (...args) => ctx.getActiveErrorResponse(...args);
   const getHeaderPreset = (...args) => ctx.getHeaderPreset(...args);
+  const hasDuplicateErrorResponse = (...args) => ctx.hasDuplicateErrorResponse(...args);
   const hasDuplicateSuccessStatus = (...args) => ctx.hasDuplicateSuccessStatus(...args);
   const hideMessageDialog = (...args) => ctx.hideMessageDialog(...args);
   const isAuthRequired = (...args) => ctx.isAuthRequired(...args);
@@ -66,11 +70,13 @@ export const createControllerRuntime = (ctx) => {
   const refresh = (...args) => ctx.refresh(...args);
   const renderActionPathParams = (...args) => ctx.renderActionPathParams(...args);
   const renderRows = (...args) => ctx.renderRows(...args);
+  const renderErrorStatusTabs = (...args) => ctx.renderErrorStatusTabs(...args);
   const renderSuccessStatusTabs = (...args) => ctx.renderSuccessStatusTabs(...args);
   const resetForm = (...args) => ctx.resetForm(...args);
   const resizeJsonPreview = (...args) => ctx.resizeJsonPreview(...args);
   const restoreOpenedFolder = (...args) => ctx.restoreOpenedFolder(...args);
   const restoreSideMenuWidth = (...args) => ctx.restoreSideMenuWidth(...args);
+  const sanitizeErrorStatusValue = (...args) => ctx.sanitizeErrorStatusValue(...args);
   const sanitizeSuccessStatusValue = (...args) => ctx.sanitizeSuccessStatusValue(...args);
   const saveMarkdown = (...args) => ctx.saveMarkdown(...args);
   const saveMarkdownAsNew = (...args) => ctx.saveMarkdownAsNew(...args);
@@ -82,6 +88,7 @@ export const createControllerRuntime = (ctx) => {
   const setHelpTopic = (...args) => ctx.setHelpTopic(...args);
   const setPreviewOpen = (...args) => ctx.setPreviewOpen(...args);
   const showSuccessStatusError = (...args) => ctx.showSuccessStatusError(...args);
+  const showWarningToast = (...args) => ctx.showWarningToast(...args);
   const startSideMenuResize = (...args) => ctx.startSideMenuResize(...args);
   const stopSideMenuResize = (...args) => ctx.stopSideMenuResize(...args);
   const syncAuthRolesForSelectedScope = (...args) => ctx.syncAuthRolesForSelectedScope(...args);
@@ -250,6 +257,67 @@ export const createControllerRuntime = (ctx) => {
     addSuccessStatusButton?.addEventListener('click', addSuccessResponse);
   };
 
+  const bindErrorStatusControls = () => {
+    const syncErrorMetaFieldExample = (key, nextValue, previousValue) => {
+      const response = getActiveErrorResponse();
+      const row = (response.fields || []).find((item) =>
+        !String(item.parentKey ?? '').trim() && String(item.key ?? '').trim() === key,
+      );
+      if (!row) return;
+      const currentExample = String(row.example ?? '').trim();
+      if (currentExample && currentExample !== String(previousValue ?? '').trim()) return;
+      row.example = nextValue;
+      renderRows('errorFields');
+    };
+
+    form.elements.errorStatus?.addEventListener('focus', () => {
+      ctx.errorStatusPreviousValue = getActiveErrorResponse().status || '400';
+    });
+
+    form.elements.errorStatus?.addEventListener('input', (event) => {
+      const nextStatus = sanitizeErrorStatusValue(form.elements.errorStatus.value);
+      form.elements.errorStatus.value = nextStatus;
+      event.stopPropagation();
+    });
+
+    form.elements.errorStatus?.addEventListener('change', (event) => {
+      const response = getActiveErrorResponse();
+      const nextStatus = sanitizeErrorStatusValue(form.elements.errorStatus.value) || '400';
+      form.elements.errorStatus.value = nextStatus;
+      event.stopPropagation();
+      if (hasDuplicateErrorResponse(nextStatus)) {
+        form.elements.errorStatus.value = ctx.errorStatusPreviousValue;
+        response.status = ctx.errorStatusPreviousValue;
+        refresh();
+        showWarningToast('Error 상태 중복', `${nextStatus} 상태가 이미 있습니다.`);
+        return;
+      }
+      response.status = nextStatus;
+      ctx.errorStatusPreviousValue = nextStatus;
+      renderErrorStatusTabs();
+      refresh();
+    });
+
+    form.elements.errorCode?.addEventListener('input', () => {
+      const response = getActiveErrorResponse();
+      const previousValue = response.code;
+      response.code = form.elements.errorCode.value;
+      syncErrorMetaFieldExample('code', response.code, previousValue);
+      renderErrorStatusTabs();
+    });
+    form.elements.errorMessage?.addEventListener('input', () => {
+      const response = getActiveErrorResponse();
+      const previousValue = response.message;
+      response.message = form.elements.errorMessage.value;
+      syncErrorMetaFieldExample('message', response.message, previousValue);
+    });
+    form.elements.errorCondition?.addEventListener('input', () => {
+      getActiveErrorResponse().condition = form.elements.errorCondition.value;
+    });
+
+    addErrorStatusButton?.addEventListener('click', addErrorResponse);
+  };
+
   const bindHelpControls = () => {
     helpButton?.addEventListener('click', () => setHelpDialogOpen(true));
     helpDialogCloseButton?.addEventListener('click', () => setHelpDialogOpen(false));
@@ -333,6 +401,7 @@ export const createControllerRuntime = (ctx) => {
       syncFilePanelLayoutMode();
       resizeJsonPreview(form.elements.bodyJson);
       resizeJsonPreview(form.elements.successJson);
+      resizeJsonPreview(form.elements.errorJson);
     });
 
     window.addEventListener('beforeunload', () => scrollPageToTop('auto'));
@@ -377,6 +446,7 @@ export const createControllerRuntime = (ctx) => {
     syncHeaderRowsWithControls();
     Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
     renderSuccessStatusTabs();
+    renderErrorStatusTabs();
     renderActionPathParams();
     refresh();
     restoreOpenedFolder();
@@ -390,6 +460,7 @@ export const createControllerRuntime = (ctx) => {
   bindGlobalDismissControls();
   bindPathControls();
   bindSuccessStatusControls();
+  bindErrorStatusControls();
   bindHelpControls();
   bindKeyboardShortcuts();
   bindWindowLifecycle();

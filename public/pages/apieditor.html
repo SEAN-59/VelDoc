@@ -552,7 +552,10 @@
           <section class="panel span-2">
             <div class="panel-head">
               <h2>Error Response</h2>
-              <button class="mini-button" data-add-row="errors" type="button">추가</button>
+              <div class="panel-head-actions">
+                <button class="mini-button" data-add-row="errorFields" type="button">필드 추가</button>
+                <button class="mini-button" id="addErrorStatusButton" type="button">상태 추가</button>
+              </div>
             </div>
             <div class="error-preset-bar" aria-label="Error Response 프리셋">
               <button class="error-preset-button" data-error-preset="400:BAD_REQUEST" type="button">400 BAD_REQUEST</button>
@@ -562,7 +565,32 @@
               <button class="error-preset-button" data-error-preset="409:CONFLICT" type="button">409 CONFLICT</button>
               <button class="error-preset-button" data-error-preset="500:INTERNAL_SERVER_ERROR" type="button">500 INTERNAL_SERVER_ERROR</button>
             </div>
-            <div class="rows" id="errorsRows"></div>
+            <div class="success-status-tabs" id="errorStatusTabs" role="tablist" aria-label="Error Response 상태 목록"></div>
+            <div class="field-grid">
+              <label class="field">
+                <span>Status</span>
+                <input name="errorStatus" type="text" inputmode="numeric" maxlength="3" placeholder="400" />
+              </label>
+              <label class="field">
+                <span>Code</span>
+                <input name="errorCode" type="text" placeholder="BAD_REQUEST" />
+              </label>
+              <label class="field wide">
+                <span>Message</span>
+                <input name="errorMessage" type="text" placeholder="요청 값이 올바르지 않습니다." />
+              </label>
+              <label class="field wide">
+                <span>발생 상황</span>
+                <input name="errorCondition" type="text" placeholder="필수 값 누락 또는 타입 오류" />
+              </label>
+              <label class="field wide">
+                <span>Error JSON 미리보기</span>
+                <textarea class="code-input json-preview-textarea success-json-preview-textarea" name="errorJson" rows="4" data-min-rows="4" data-max-rows="12" spellcheck="false" readonly placeholder="필드를 추가하면 JSON이 자동 생성됩니다."></textarea>
+                <p class="field-hint">상위 필드는 UpKey를 비워두고, 하위 필드는 부모 Key를 UpKey에 입력합니다.<br>축약 Type은 저장 시 `integer`, `double[]`처럼 변환됩니다.</p>
+              </label>
+            </div>
+            <div class="rows top-gap" id="errorFieldsRows"></div>
+            <div class="rows" id="errorsRows" hidden></div>
           </section>
 
         </form>

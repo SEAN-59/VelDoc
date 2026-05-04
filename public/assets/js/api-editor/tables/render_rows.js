@@ -28,6 +28,7 @@ export const createTableRenderRuntime = (ctx) => {
   const addEnterRowHandler = (...args) => ctx.addEnterRowHandler(...args);
   const buildApiPath = (...args) => ctx.buildApiPath(...args);
   const buildBodyJson = (...args) => ctx.buildBodyJson(...args);
+  const buildErrorJson = (...args) => ctx.buildErrorJson(...args);
   const buildFileLocation = (...args) => ctx.buildFileLocation(...args);
   const buildFileNameFromPath = (...args) => ctx.buildFileNameFromPath(...args);
   const buildPathParamPreview = (...args) => ctx.buildPathParamPreview(...args);
@@ -36,6 +37,7 @@ export const createTableRenderRuntime = (ctx) => {
   const clearDragIndicators = (...args) => ctx.clearDragIndicators(...args);
   const disableBrowserTextAssist = (...args) => ctx.disableBrowserTextAssist(...args);
   const generateMarkdown = (...args) => ctx.generateMarkdown(...args);
+  const getActiveErrorResponse = (...args) => ctx.getActiveErrorResponse(...args);
   const getActiveSuccessResponse = (...args) => ctx.getActiveSuccessResponse(...args);
   const getDropPosition = (...args) => ctx.getDropPosition(...args);
   const getMutableRows = (...args) => ctx.getMutableRows(...args);
@@ -46,6 +48,7 @@ export const createTableRenderRuntime = (ctx) => {
   const refresh = (...args) => ctx.refresh(...args);
   const removeRow = (...args) => ctx.removeRow(...args);
   const renderAuthPolicyScopes = (...args) => ctx.renderAuthPolicyScopes(...args);
+  const renderErrorStatusTabs = (...args) => ctx.renderErrorStatusTabs(...args);
   const renderSuccessStatusTabs = (...args) => ctx.renderSuccessStatusTabs(...args);
   const resizeJsonPreview = (...args) => ctx.resizeJsonPreview(...args);
   const saveDraft = (...args) => ctx.saveDraft(...args);
@@ -55,7 +58,7 @@ export const createTableRenderRuntime = (ctx) => {
   const syncAuthState = (...args) => ctx.syncAuthState(...args);
   const syncMethodState = (...args) => ctx.syncMethodState(...args);
   const updateRow = (...args) => ctx.updateRow(...args);
-  const draggableRowTypes = new Set(['pathParams', 'queryParams', 'bodyFields', 'responseFields', 'errors']);
+  const draggableRowTypes = new Set(['pathParams', 'queryParams', 'bodyFields', 'responseFields', 'errorFields', 'errors']);
   const rowDragDataType = 'application/x-veldoc-row';
 
   let renderActionPathParams,
@@ -136,7 +139,25 @@ export const createTableRenderRuntime = (ctx) => {
       form.elements.successJson.value = buildSuccessJson();
       resizeJsonPreview(form.elements.successJson);
     }
+    const activeErrorResponse = getActiveErrorResponse();
+    if (form.elements.errorStatus) {
+      form.elements.errorStatus.value = activeErrorResponse.status;
+    }
+    if (form.elements.errorCode) {
+      form.elements.errorCode.value = activeErrorResponse.code;
+    }
+    if (form.elements.errorMessage) {
+      form.elements.errorMessage.value = activeErrorResponse.message;
+    }
+    if (form.elements.errorCondition) {
+      form.elements.errorCondition.value = activeErrorResponse.condition;
+    }
+    if (form.elements.errorJson) {
+      form.elements.errorJson.value = buildErrorJson(activeErrorResponse);
+      resizeJsonPreview(form.elements.errorJson);
+    }
     renderSuccessStatusTabs();
+    renderErrorStatusTabs();
     preview.textContent = generateMarkdown();
     if (shouldSaveDraft) saveDraft();
   };
@@ -341,7 +362,7 @@ export const createTableRenderRuntime = (ctx) => {
     const container = document.querySelector(`#${definition.id}`);
     container.replaceChildren();
 
-    if (['headers', 'pathParams', 'actionPathParams', 'queryParams', 'bodyFields', 'responseFields', 'errors'].includes(type)) {
+    if (['headers', 'pathParams', 'actionPathParams', 'queryParams', 'bodyFields', 'responseFields', 'errorFields', 'errors'].includes(type)) {
       renderFieldTableRows(type, definition, container);
       return;
     }

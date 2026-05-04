@@ -1,18 +1,77 @@
-export const createDefaultRows = (errorResponsePresets) => ({
+export const createDefaultRows = () => ({
   headers: [{ required: 'Y' }],
   pathParams: [],
   actionPathParams: [],
   queryParams: [],
   bodyFields: [],
   responseFields: [],
-  errors: errorResponsePresets.slice(0, 4).map((preset) => ({ ...preset })),
+  errorFields: [],
+  errors: [],
 });
 
 export const createDefaultSuccessResponses = () => [{ status: '200', fields: [] }];
 
+export const createDefaultErrorFields = (preset = {}) => [
+  {
+    parentKey: '',
+    key: 'requestId',
+    type: 'string',
+    nullable: 'Y',
+    example: 'req_123456',
+    description: '요청 추적 ID',
+  },
+  {
+    parentKey: '',
+    key: 'code',
+    type: 'string',
+    nullable: 'N',
+    example: preset.code || 'BAD_REQUEST',
+    description: '에러 코드',
+  },
+  {
+    parentKey: '',
+    key: 'message',
+    type: 'string',
+    nullable: 'N',
+    example: preset.message || '요청 값이 올바르지 않습니다.',
+    description: '에러 메시지',
+  },
+  {
+    parentKey: '',
+    key: 'errors',
+    type: 'object[]',
+    nullable: 'Y',
+    example: '[]',
+    description: '상세 오류 목록',
+  },
+  {
+    parentKey: 'errors',
+    key: 'field',
+    type: 'string',
+    nullable: 'Y',
+    example: 'email',
+    description: '오류 필드',
+  },
+  {
+    parentKey: 'errors',
+    key: 'reason',
+    type: 'string',
+    nullable: 'Y',
+    example: '이미 사용 중인 이메일입니다.',
+    description: '오류 사유',
+  },
+];
+
+export const createDefaultErrorResponses = (errorResponsePresets) =>
+  errorResponsePresets.slice(0, 4).map((preset) => ({
+    ...preset,
+    fields: createDefaultErrorFields(preset),
+  }));
+
 export const createEditorState = ({
   defaultRows,
   defaultSuccessResponses,
+  defaultErrorResponses,
   sideMenuDefaultWidth,
   authPolicyVersion,
 }) => ({
@@ -35,6 +94,8 @@ export const createEditorState = ({
   fileDrawerOpen: false,
   successResponses: structuredClone(defaultSuccessResponses),
   activeSuccessResponseIndex: 0,
+  errorResponses: structuredClone(defaultErrorResponses),
+  activeErrorResponseIndex: 0,
   viewerCommon: '',
   viewerVersion: '',
   pendingCurrentFileMeta: null,
@@ -55,6 +116,8 @@ export const createEditorTransientFlags = () => ({
   sideMenuResizeState: null,
   successStatusPreviousValue: '200',
   successStatusDragState: null,
+  errorStatusPreviousValue: '400',
+  errorStatusDragState: null,
   isSaveShortcutRunning: false,
   isAuthPolicyScopeManuallySelected: false,
   transientErrorClearTimer: null,
@@ -65,15 +128,19 @@ export const createStateRuntime = ({
   SIDE_MENU_DEFAULT_WIDTH,
   AUTH_POLICY_VERSION,
 }) => {
-  const defaultRows = createDefaultRows(ERROR_RESPONSE_PRESETS);
+  const defaultRows = createDefaultRows();
   const defaultSuccessResponses = createDefaultSuccessResponses();
+  const defaultErrorResponses = createDefaultErrorResponses(ERROR_RESPONSE_PRESETS);
 
   return {
+    createDefaultErrorFields,
     defaultRows,
     defaultSuccessResponses,
+    defaultErrorResponses,
     state: createEditorState({
       defaultRows,
       defaultSuccessResponses,
+      defaultErrorResponses,
       sideMenuDefaultWidth: SIDE_MENU_DEFAULT_WIDTH,
       authPolicyVersion: AUTH_POLICY_VERSION,
     }),

@@ -10,6 +10,9 @@ export const createRowActionsRuntime = (ctx) => {
     state,
   } = ctx;
 
+  const createErrorResponse = (...args) => ctx.createErrorResponse(...args);
+  const focusErrorStatusInput = (...args) => ctx.focusErrorStatusInput(...args);
+  const getErrorResponses = (...args) => ctx.getErrorResponses(...args);
   const applyAutoExampleForRow = (...args) => ctx.applyAutoExampleForRow(...args);
   const getActiveSuccessResponse = (...args) => ctx.getActiveSuccessResponse(...args);
   const getHeaderPreset = (...args) => ctx.getHeaderPreset(...args);
@@ -20,6 +23,8 @@ export const createRowActionsRuntime = (ctx) => {
   const refresh = (...args) => ctx.refresh(...args);
   const removeActionPathParam = (...args) => ctx.removeActionPathParam(...args);
   const renderRows = (...args) => ctx.renderRows(...args);
+  const renderErrorStatusTabs = (...args) => ctx.renderErrorStatusTabs(...args);
+  const setActiveErrorResponseIndex = (...args) => ctx.setActiveErrorResponseIndex(...args);
   const setStatus = (...args) => ctx.setStatus(...args);
   const syncHeaderRowsWithControls = (...args) => ctx.syncHeaderRowsWithControls(...args);
   const toPathParamToken = (...args) => ctx.toPathParamToken(...args);
@@ -41,6 +46,7 @@ export const createRowActionsRuntime = (ctx) => {
 
   ctx.getMutableRows = getMutableRows = (type) => {
     if (type === 'responseFields') return getActiveSuccessResponse().fields;
+    if (type === 'errorFields') return ctx.getActiveErrorResponse().fields;
     return state.rows[type];
   };
 
@@ -98,7 +104,7 @@ export const createRowActionsRuntime = (ctx) => {
   };
 
   ctx.findErrorRowIndex = findErrorRowIndex = (preset) =>
-    (state.rows.errors || []).findIndex((row) => row.status === preset.status && row.code === preset.code);
+    getErrorResponses().findIndex((response) => response.status === preset.status);
 
   ctx.addErrorPreset = addErrorPreset = (id) => {
     const preset = getErrorPreset(id);
@@ -106,15 +112,19 @@ export const createRowActionsRuntime = (ctx) => {
 
     const existingIndex = findErrorRowIndex(preset);
     if (existingIndex >= 0) {
-      focusFirstInputInRow('errors', existingIndex);
+      setActiveErrorResponseIndex(existingIndex);
+      focusErrorStatusInput();
       setStatus(`${preset.status} ${preset.code} 에러가 이미 있습니다.`);
       return;
     }
 
-    state.rows.errors.push({ ...preset });
-    renderRows('errors');
+    const responses = getErrorResponses();
+    responses.push(createErrorResponse(preset));
+    state.activeErrorResponseIndex = responses.length - 1;
+    renderErrorStatusTabs();
+    renderRows('errorFields');
     refresh();
-    focusFirstInputInRow('errors', state.rows.errors.length - 1);
+    focusErrorStatusInput();
     setStatus(`${preset.status} ${preset.code} 에러 추가됨`);
   };
 

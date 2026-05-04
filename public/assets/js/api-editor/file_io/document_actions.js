@@ -5,6 +5,7 @@ export const createDocumentActionsRuntime = (ctx) => {
     HOME_TOAST_SESSION_KEY,
     STORAGE_KEY,
     WORKSPACE_REQUIRED_NOTICE,
+    defaultErrorResponses,
     defaultRows,
     defaultSuccessResponses,
     fileTreeRoot,
@@ -40,6 +41,7 @@ export const createDocumentActionsRuntime = (ctx) => {
   const renderActionPathParams = (...args) => ctx.renderActionPathParams(...args);
   const renderAuthPolicyScopes = (...args) => ctx.renderAuthPolicyScopes(...args);
   const renderAuthRoles = (...args) => ctx.renderAuthRoles(...args);
+  const renderErrorStatusTabs = (...args) => ctx.renderErrorStatusTabs(...args);
   const renderFileTree = (...args) => ctx.renderFileTree(...args);
   const renderRows = (...args) => ctx.renderRows(...args);
   const renderSuccessStatusTabs = (...args) => ctx.renderSuccessStatusTabs(...args);
@@ -361,10 +363,13 @@ export const createDocumentActionsRuntime = (ctx) => {
   state.rows = structuredClone(defaultRows);
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
+  state.errorResponses = structuredClone(defaultErrorResponses);
+  state.activeErrorResponseIndex = 0;
   clearCurrentFile();
   renderAuthRoles();
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
+  renderErrorStatusTabs();
   renderActionPathParams();
   localStorage.removeItem(STORAGE_KEY);
   refresh();
@@ -833,10 +838,13 @@ export const createDocumentActionsRuntime = (ctx) => {
   state.rows = structuredClone(defaultRows);
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
+  state.errorResponses = structuredClone(defaultErrorResponses);
+  state.activeErrorResponseIndex = 0;
   renderAuthRoles();
   syncHeaderRowsWithControls({ allowAuthorization: true });
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
+  renderErrorStatusTabs();
   renderActionPathParams();
   localStorage.removeItem(STORAGE_KEY);
   refresh();
@@ -857,6 +865,8 @@ export const createDocumentActionsRuntime = (ctx) => {
   state.rows = structuredClone(defaultRows);
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
+  state.errorResponses = structuredClone(defaultErrorResponses);
+  state.activeErrorResponseIndex = 0;
   clearCurrentFile();
   state.hasActiveDocument = true;
   state.authSelectedRoles = [];
@@ -870,6 +880,7 @@ export const createDocumentActionsRuntime = (ctx) => {
   syncHeaderRowsWithControls({ allowAuthorization: true });
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
+  renderErrorStatusTabs();
   renderActionPathParams();
   refresh();
   focusFileLocation();

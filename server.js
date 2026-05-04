@@ -397,6 +397,30 @@ const parseRowsByHeaders = (section, mapping) => {
     .filter((row) => Object.values(row).some((value) => String(value ?? '').trim()));
 };
 
+const parseRowsByHeadersFromMatchingTable = (section, mapping, predicate) => {
+  const tableData = parseMarkdownTables(section).find(predicate);
+  if (!tableData) return [];
+
+  const indexes = mapping.map(([, header]) => {
+    const aliases = Array.isArray(header) ? header : [header];
+    return tableData.headers.findIndex((cell) => aliases.includes(cell));
+  });
+  return tableData.rows
+    .map((row) =>
+      mapping.reduce((acc, [key], index) => {
+        const tableIndex = indexes[index];
+        acc[key] = tableIndex >= 0 ? cleanMarkdownValue(row[tableIndex]) : '';
+        return acc;
+      }, {}),
+    )
+    .filter((row) => {
+      if (Object.prototype.hasOwnProperty.call(row, 'key')) {
+        return String(row.key ?? '').trim() !== '';
+      }
+      return Object.values(row).some((value) => String(value ?? '').trim());
+    });
+};
+
 const responseFieldMapping = [
   ['parentKey', 'UpKey'],
   ['key', 'Key'],
@@ -407,12 +431,37 @@ const responseFieldMapping = [
 ];
 
 const parseResponseFields = (section) =>
-  parseRowsByHeaders(section, responseFieldMapping).map((row) => ({ ...row, nullable: row.nullable || 'N' }));
+  parseRowsByHeadersFromMatchingTable(
+    section,
+    responseFieldMapping,
+    (table) => table.headers.includes('Key') && table.headers.includes('Type') && table.headers.includes('Nullable'),
+  ).map((row) => ({ ...row, nullable: row.nullable || 'N' }));
 
 const extractJsonBlock = (section) => {
   const match = /```json\s*([\s\S]*?)```/i.exec(section);
   return cleanMarkdownValue(match?.[1] ?? '');
 };
+
+const parseLegacyErrorRows = (section) =>
+  parseRowsByHeadersFromMatchingTable(
+    section,
+    [
+      ['status', 'Status'],
+      ['code', 'Code'],
+      ['message', 'Message'],
+      ['condition', '발생 상황'],
+    ],
+    (table) => table.headers.includes('Status') && table.headers.includes('Code'),
+  );
+
+const parseErrorResponseBlock = (block, fallbackStatus = '400') => ({
+  status: cleanMarkdownValue(block.match(/Status:\s*`?([^`\n]+)`?/)?.[1] || fallbackStatus) || fallbackStatus,
+  code: getMarkdownTableValue(block, 'Code') || 'ERROR_CODE',
+  message: getMarkdownTableValue(block, 'Message') || '오류 메시지를 입력해주세요.',
+  condition: getMarkdownTableValue(block, '발생 상황'),
+  json: extractJsonBlock(block),
+  fields: parseResponseFields(block),
+});
 
 const parseSuccessResponsesFromMarkdown = (section) => {
   const blockPattern = /^###\s+(?:\d+\.\s+)?Status\s+`?([^`\n]+)`?\s*$/gmi;
@@ -440,6 +489,30 @@ const parseSuccessResponsesFromMarkdown = (section) => {
   });
 };
 
+const parseErrorResponsesFromMarkdown = (section) => {
+  const blockPattern = /^###\s+(?:\d+\.\s+)?Status\s+`?([^`\n]+)`?\s*$/gmi;
+  const matches = [...section.matchAll(blockPattern)];
+
+  if (matches.length === 0) {
+    const legacyRows = parseLegacyErrorRows(section);
+    if (legacyRows.length > 0) {
+      return legacyRows.map((row) => ({
+        ...row,
+        json: '',
+        fields: [],
+      }));
+    }
+    return [parseErrorResponseBlock(section)];
+  }
+
+  return matches.map((match, index) => {
+    const start = match.index + match[0].length;
+    const end = matches[index + 1]?.index ?? section.length;
+    const block = section.slice(start, end).trim();
+    return parseErrorResponseBlock(block, cleanMarkdownValue(match[1]) || '400');
+  });
+};
+
 const getSpecSummary = async (filePath, fileTreeRoot) => {
   const markdown = await readFile(filePath, 'utf8');
   const title = cleanMarkdownValue(markdown.match(/^#\s+(.+)$/m)?.[1] ?? '');
@@ -447,7 +520,9 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
   const authSection = getMarkdownSection(markdown, '인증 / 권한');
   const bodySection = getMarkdownSection(markdown, 'Body');
   const successSection = getMarkdownSection(markdown, 'Success Response');
+  const errorSection = getMarkdownSection(markdown, 'Error Response');
   const successResponses = parseSuccessResponsesFromMarkdown(successSection);
+  const errorResponses = parseErrorResponsesFromMarkdown(errorSection);
   const primarySuccessResponse = successResponses[0] || { status: '200', json: '', fields: [] };
   const pathValue = getMarkdownTableValue(basicSection, 'Path');
 
@@ -510,12 +585,8 @@ const getSpecSummary = async (filePath, fileTreeRoot) => {
     ]),
     successJson: primarySuccessResponse.json,
     responseFields: primarySuccessResponse.fields,
-    errors: parseRowsByHeaders(getMarkdownSection(markdown, 'Error Response'), [
-      ['status', 'Status'],
-      ['code', 'Code'],
-      ['message', 'Message'],
-      ['condition', '발생 상황'],
-    ]),
+    errors: errorResponses.map(({ status, code, message, condition }) => ({ status, code, message, condition })),
+    errorResponses,
   };
 };
 
