@@ -13,6 +13,7 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
 
   let
     getSubCategoryTableValue,
+    parseAuthRoleOriginMap,
     parsePathPartsFromMarkdown,
     requiredMarkdownSections,
     isApiSpecMarkdown,
@@ -21,6 +22,27 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
 
   ctx.getSubCategoryTableValue = getSubCategoryTableValue = (section) =>
     ctx.getMarkdownTableValue(section, '소분류');
+
+  ctx.parseAuthRoleOriginMap = parseAuthRoleOriginMap = (value) => {
+    const origins = {};
+
+    ctx.parseCsvValues(value).forEach((item) => {
+      const separatorIndex = item.indexOf('=');
+      if (separatorIndex <= 0) return;
+
+      const role = ctx.normalizeRoleValue
+        ? ctx.normalizeRoleValue(item.slice(0, separatorIndex))
+        : String(item.slice(0, separatorIndex) ?? '').trim();
+      const path = ctx.normalizeAuthPolicyPath
+        ? ctx.normalizeAuthPolicyPath(item.slice(separatorIndex + 1))
+        : String(item.slice(separatorIndex + 1) ?? '').trim();
+      if (!role || !path) return;
+
+      origins[role] = path;
+    });
+
+    return origins;
+  };
 
   ctx.parsePathPartsFromMarkdown = parsePathPartsFromMarkdown = (path, subCategory, pathParamRows) => {
     const segments = ctx.splitPathPart(blankIfPlaceholder(path));
@@ -158,7 +180,11 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
     ctx.setFormValue('authScheme', authSchemeState.scheme);
     ctx.setFormValue('authSchemeCustom', authSchemeState.custom);
     const markdownRoles = ctx.parseCsvValues(auth['접근 가능 Role']);
+    state.authSelectedRoles = [];
+    state.authSelectedRoleOrigins = parseAuthRoleOriginMap(auth['Role 적용 범위']);
+    state.authRoleVisibleScopePath = '';
     const authPolicyScopeOption = ctx.getSelectedAuthPolicyScopeOption();
+    ctx.ensureAuthPolicyRolesFromOrigins?.(markdownRoles, state.authSelectedRoleOrigins, authPolicyScopeOption.path);
     ctx.renderAuthRoles(ctx.createAuthRoleItemsWithCatalog(markdownRoles, authPolicyScopeOption.path), {
       scopePath: authPolicyScopeOption.path,
     });
@@ -192,6 +218,7 @@ export const createMarkdownLoadSpecRuntime = (ctx) => {
 
   return {
     getSubCategoryTableValue,
+    parseAuthRoleOriginMap,
     parsePathPartsFromMarkdown,
     requiredMarkdownSections,
     isApiSpecMarkdown,

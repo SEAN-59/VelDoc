@@ -21,6 +21,11 @@ export const createMarkdownGenerateRuntime = (ctx) => {
       ? `${authPolicyScopeOption.label} (${authPolicyScopeOption.value}: ${authPolicyScopeOption.path})`
       : '해당 없음';
     const roleText = authRequired === '필요' ? roles.join(', ') || '없음' : '해당 없음';
+    const roleScopeText = authRequired === '필요'
+      ? roles
+        .map((role) => `${role}=${ctx.resolveAuthRoleOriginForScope?.(role, authPolicyScopePath) || authPolicyScopePath}`)
+        .join(', ') || '없음'
+      : '해당 없음';
     const permissionRules = authRequired === '필요' ? ctx.input('permissionRules') || '미정' : '해당 없음';
     const headerRows = ctx.buildHeaderRowsForMarkdown({ authRequired, authScheme, method });
 
@@ -44,6 +49,7 @@ export const createMarkdownGenerateRuntime = (ctx) => {
 | 인증 방식 | ${ctx.escapePipes(authScheme)} |
 | 적용 범위 | ${ctx.escapePipes(authPolicyScopeText)} |
 | 접근 가능 Role | ${ctx.escapePipes(roleText)} |
+| Role 적용 범위 | ${ctx.escapePipes(roleScopeText)} |
 | 권한 규칙 | ${ctx.escapePipes(permissionRules)} |
 
 ## 3. Headers

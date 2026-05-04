@@ -16,7 +16,7 @@ export const createAuthRoleCardsRuntime = (ctx) => {
   const getAuthRoleItems = (...args) => ctx.getAuthRoleItems(...args);
   const normalizeAuthRoleRenderItems = (...args) => ctx.normalizeAuthRoleRenderItems(...args);
   const getCheckedRoleValuesFromItems = (...args) => ctx.getCheckedRoleValuesFromItems(...args);
-  const findAuthRoleOriginPathForScope = (...args) => ctx.findAuthRoleOriginPathForScope(...args);
+  const resolveAuthRoleOriginForScope = (...args) => ctx.resolveAuthRoleOriginForScope(...args);
   const rememberAuthSelectedRoles = (...args) => ctx.rememberAuthSelectedRoles(...args);
   const forgetAuthSelectedRole = (...args) => ctx.forgetAuthSelectedRole(...args);
   const syncAuthRoleSelectionMemoryFromVisibleCards = (...args) => ctx.syncAuthRoleSelectionMemoryFromVisibleCards(...args);
@@ -40,8 +40,7 @@ export const createAuthRoleCardsRuntime = (ctx) => {
     const selectedOriginPath = state.authSelectedRoleOrigins[normalizedRole]
       ? normalizeAuthPolicyPath(state.authSelectedRoleOrigins[normalizedRole])
       : '';
-    const policyOriginPath = findAuthRoleOriginPathForScope(normalizedRole, scopePath);
-    const originPath = selectedOriginPath || policyOriginPath;
+    const originPath = resolveAuthRoleOriginForScope(normalizedRole, scopePath) || selectedOriginPath;
 
     if (!originPath || originPath === scopePath) return '';
 
@@ -52,10 +51,23 @@ export const createAuthRoleCardsRuntime = (ctx) => {
   ctx.createAuthRoleCard = createAuthRoleCard = (roleItem) => {
     const value = normalizeRoleValue(typeof roleItem === 'string' ? roleItem : roleItem.value);
     const checked = typeof roleItem === 'string' ? true : roleItem.checked !== false;
+    const scopePath = normalizeAuthPolicyPath(
+      state.authRoleVisibleScopePath ||
+      getSelectedAuthPolicyScopeOption()?.path ||
+      buildApiPath(),
+    );
+    const originPath = resolveAuthRoleOriginForScope(value, scopePath);
+    const isInheritedRole = Boolean(originPath && originPath !== scopePath);
 
     const card = document.createElement('div');
     card.className = 'auth-role-card';
     card.dataset.authRoleCard = 'true';
+    card.dataset.authRoleOrigin = originPath || scopePath;
+    card.classList.toggle('auth-role-inherited', isInheritedRole);
+    card.classList.toggle('auth-role-local', !isInheritedRole);
+    card.title = isInheritedRole
+      ? `${originPath} 적용 범위에서 상속된 Role입니다.`
+      : `${scopePath} 적용 범위의 Role입니다.`;
 
     const label = document.createElement('label');
     label.className = 'auth-role-card-label';
@@ -95,7 +107,7 @@ export const createAuthRoleCardsRuntime = (ctx) => {
 
       forgetAuthSelectedRole(value);
       card.remove();
-      syncAuthRoleSelectionMemoryFromVisibleCards();
+      syncAuthRoleSelectionMemoryFromVisibleCards({ deleteWhenEmpty: true });
       refresh();
     });
 

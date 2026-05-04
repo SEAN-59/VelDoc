@@ -55,6 +55,8 @@ export const createTableRenderRuntime = (ctx) => {
   const syncAuthState = (...args) => ctx.syncAuthState(...args);
   const syncMethodState = (...args) => ctx.syncMethodState(...args);
   const updateRow = (...args) => ctx.updateRow(...args);
+  const draggableRowTypes = new Set(['pathParams', 'queryParams', 'bodyFields', 'responseFields', 'errors']);
+  const rowDragDataType = 'application/x-veldoc-row';
 
   let renderActionPathParams,
     refreshEditor,
@@ -211,7 +213,7 @@ export const createTableRenderRuntime = (ctx) => {
   ctx.renderFieldTableRows = renderFieldTableRows = function(type, definition, container) {
     const rows = getMutableRows(type);
     if (rows.length === 0) return;
-    const canDrag = type === 'pathParams';
+    const canDrag = draggableRowTypes.has(type);
 
     const tableElement = document.createElement('div');
     tableElement.className = 'field-table';
@@ -239,6 +241,7 @@ export const createTableRenderRuntime = (ctx) => {
       if (canDrag) {
         rowElement.dataset.index = String(index);
         rowElement.addEventListener('dragover', (event) => {
+          if (![...event.dataTransfer.types].includes(rowDragDataType)) return;
           event.preventDefault();
           const position = getDropPosition(event, rowElement);
           clearDragIndicators(tableElement);
@@ -251,7 +254,9 @@ export const createTableRenderRuntime = (ctx) => {
           event.preventDefault();
           const position = getDropPosition(event, rowElement);
           rowElement.classList.remove('drag-over-before', 'drag-over-after');
-          const fromIndex = Number.parseInt(event.dataTransfer.getData('text/plain'), 10);
+          const dragData = JSON.parse(event.dataTransfer.getData(rowDragDataType) || '{}');
+          if (dragData.type !== type) return;
+          const fromIndex = Number.parseInt(String(dragData.index), 10);
           moveRow(type, fromIndex, index, position);
         });
 
@@ -263,7 +268,9 @@ export const createTableRenderRuntime = (ctx) => {
         dragHandle.setAttribute('aria-label', '행 순서 변경');
         dragHandle.addEventListener('dragstart', (event) => {
           event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', String(index));
+          const dragData = JSON.stringify({ type, index });
+          event.dataTransfer.setData(rowDragDataType, dragData);
+          event.dataTransfer.setData('text/plain', dragData);
           rowElement.classList.add('dragging');
         });
         dragHandle.addEventListener('dragend', () => {

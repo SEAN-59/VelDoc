@@ -20,14 +20,16 @@ export const createAuthRolesRuntime = (ctx) => {
     getCheckedRoleValuesFromItems,
     mergeAuthRoleValues,
     findAuthRoleOriginPathForScope,
+    resolveAuthRoleOriginForScope,
     rememberAuthSelectedRoles,
     forgetAuthSelectedRole,
     getAuthRoleCatalogForPath,
     isAuthRoleVisibleAtScopePath,
-    migrateVisibleAuthRoleScope,
+    ensureAuthPolicyRolesFromOrigins,
     stageAuthPolicyForScopeFromVisibleCards,
     syncAuthRoleSelectionMemoryFromVisibleCards,
     sortAuthRolesByScopeOrder,
+    isAuthRoleSelectedRoleAvailableForScope,
     getSelectedAuthRolesForScope,
     createAuthRoleItemsWithCatalog,
     syncAuthRolesForSelectedScope,
@@ -98,6 +100,20 @@ export const createAuthRolesRuntime = (ctx) => {
   };
 
   
+  ctx.resolveAuthRoleOriginForScope = resolveAuthRoleOriginForScope = (role, path = buildApiPath()) => {
+    const normalizedRole = normalizeRoleValue(role);
+    if (!normalizedRole) return '';
+
+    const scopePath = normalizeAuthPolicyPath(path);
+    const policyOriginPath = findAuthRoleOriginPathForScope(normalizedRole, scopePath);
+    const selectedOriginPath = state.authSelectedRoleOrigins[normalizedRole]
+      ? normalizeAuthPolicyPath(state.authSelectedRoleOrigins[normalizedRole])
+      : '';
+
+    return policyOriginPath || selectedOriginPath || scopePath;
+  };
+
+
   ctx.rememberAuthSelectedRoles = rememberAuthSelectedRoles = (roles = [], options = {}) => {
     const scopePath = normalizeAuthPolicyPath(options.scopePath || state.authRoleVisibleScopePath || buildApiPath());
     const selectedRoles = mergeAuthRoleValues(roles);
@@ -105,13 +121,11 @@ export const createAuthRolesRuntime = (ctx) => {
     const nextOrigins = {};
 
     selectedRoles.forEach((role) => {
-      nextOrigins[role] = state.authSelectedRoleOrigins[role] ||
-        findAuthRoleOriginPathForScope(role, scopePath) ||
-        scopePath;
+      nextOrigins[role] = resolveAuthRoleOriginForScope(role, scopePath);
     });
 
     Object.keys(state.authSelectedRoleOrigins).forEach((role) => {
-      if (selectedRoleSet.has(role)) nextOrigins[role] = state.authSelectedRoleOrigins[role];
+      if (selectedRoleSet.has(role) && !nextOrigins[role]) nextOrigins[role] = state.authSelectedRoleOrigins[role];
     });
 
     state.authSelectedRoles = selectedRoles;
@@ -155,30 +169,30 @@ export const createAuthRolesRuntime = (ctx) => {
     return Boolean(originPath && getAuthPolicyPathChain(normalizeAuthPolicyPath(path)).includes(originPath));
   };
 
-  
-  ctx.migrateVisibleAuthRoleScope = migrateVisibleAuthRoleScope = (fromPath, toPath, roles = []) => {
-    const sourcePath = normalizeAuthPolicyPath(fromPath);
-    const targetPath = normalizeAuthPolicyPath(toPath);
-    if (!sourcePath || !targetPath || sourcePath === targetPath) return false;
+  ctx.ensureAuthPolicyRolesFromOrigins = ensureAuthPolicyRolesFromOrigins = (roles = [], origins = {}, fallbackPath = buildApiPath()) => {
+    const selectedRoles = mergeAuthRoleValues(roles);
+    if (selectedRoles.length === 0) return false;
 
+    const nextPolicies = normalizeAuthPolicies(state.authPolicies);
     let changed = false;
-    mergeAuthRoleValues(roles).forEach((role) => {
-      const currentOriginPath = state.authSelectedRoleOrigins[role]
-        ? normalizeAuthPolicyPath(state.authSelectedRoleOrigins[role])
-        : '';
-      const policyOriginPath = findAuthRoleOriginPathForScope(role, sourcePath);
-      const originPath = currentOriginPath || policyOriginPath;
-      if (originPath !== sourcePath) return;
 
-      state.authSelectedRoleOrigins[role] = targetPath;
+    selectedRoles.forEach((role) => {
+      const originPath = normalizeAuthPolicyPath(origins[role] || fallbackPath);
+      const policy = normalizeAuthPolicyRecord(nextPolicies.policies[originPath]);
+      const policyRoles = mergeAuthRoleValues(policy.roles || []);
+      if (policyRoles.includes(role)) return;
+
+      policy.roles = mergeAuthRoleValues(policyRoles, role);
+      nextPolicies.policies[originPath] = policy;
       changed = true;
     });
 
+    if (changed) state.authPolicies = nextPolicies;
     return changed;
   };
 
-  
-  ctx.stageAuthPolicyForScopeFromVisibleCards = stageAuthPolicyForScopeFromVisibleCards = (scopePath = state.authRoleVisibleScopePath) => {
+  ctx.stageAuthPolicyForScopeFromVisibleCards = stageAuthPolicyForScopeFromVisibleCards = (scopePath = state.authRoleVisibleScopePath, options = {}) => {
+    const { deleteWhenEmpty = false } = options;
     const normalizedScopePath = normalizeAuthPolicyPath(scopePath);
     if (!normalizedScopePath) return false;
 
@@ -186,7 +200,7 @@ export const createAuthRolesRuntime = (ctx) => {
     const nextPolicy = normalizeAuthPolicyRecord(collectAuthPolicyFromForm(normalizedScopePath));
     if ((nextPolicy.roles || []).length > 0) {
       nextPolicies.policies[normalizedScopePath] = nextPolicy;
-    } else {
+    } else if (deleteWhenEmpty) {
       delete nextPolicies.policies[normalizedScopePath];
     }
     state.authPolicies = nextPolicies;
@@ -194,13 +208,15 @@ export const createAuthRolesRuntime = (ctx) => {
   };
 
   
-  ctx.syncAuthRoleSelectionMemoryFromVisibleCards = syncAuthRoleSelectionMemoryFromVisibleCards = () => {
+  ctx.syncAuthRoleSelectionMemoryFromVisibleCards = syncAuthRoleSelectionMemoryFromVisibleCards = (options = {}) => {
     const visibleItems = getAuthRoleItems();
     const visibleRoleSet = new Set(visibleItems.map((item) => item.value));
     const checkedVisibleRoles = visibleItems.filter((item) => item.checked).map((item) => item.value);
     const hiddenSelectedRoles = state.authSelectedRoles.filter((role) => !visibleRoleSet.has(role));
 
-    stageAuthPolicyForScopeFromVisibleCards(state.authRoleVisibleScopePath);
+    stageAuthPolicyForScopeFromVisibleCards(state.authRoleVisibleScopePath, {
+      deleteWhenEmpty: Boolean(options.deleteWhenEmpty),
+    });
     rememberAuthSelectedRoles(mergeAuthRoleValues(hiddenSelectedRoles, checkedVisibleRoles), {
       scopePath: state.authRoleVisibleScopePath,
     });
@@ -237,6 +253,16 @@ export const createAuthRolesRuntime = (ctx) => {
   };
 
   
+  ctx.isAuthRoleSelectedRoleAvailableForScope = isAuthRoleSelectedRoleAvailableForScope = (role, path = buildApiPath()) => {
+    const normalizedRole = normalizeRoleValue(role);
+    if (!normalizedRole) return false;
+    if (isAuthRoleVisibleAtScopePath(normalizedRole, path)) return true;
+
+    const hasSelectedOrigin = Boolean(state.authSelectedRoleOrigins[normalizedRole]);
+    const hasPolicyOrigin = Boolean(findAuthRoleOriginPathForScope(normalizedRole, path));
+    return !hasSelectedOrigin && !hasPolicyOrigin;
+  };
+
   ctx.getSelectedAuthRolesForScope = getSelectedAuthRolesForScope = (path = buildApiPath()) => {
     syncAuthRoleSelectionMemoryFromVisibleCards();
     return sortAuthRolesByScopeOrder(
@@ -247,12 +273,14 @@ export const createAuthRolesRuntime = (ctx) => {
 
   
   ctx.createAuthRoleItemsWithCatalog = createAuthRoleItemsWithCatalog = (checkedRoles = [], path = buildApiPath()) => {
-    const selectedRoles = mergeAuthRoleValues(checkedRoles);
+    const normalizedPath = normalizeAuthPolicyPath(path);
+    const selectedRoles = mergeAuthRoleValues(checkedRoles)
+      .filter((role) => isAuthRoleSelectedRoleAvailableForScope(role, normalizedPath));
     const selectedRoleSet = new Set(selectedRoles);
 
     return sortAuthRolesByScopeOrder(
-      mergeAuthRoleValues(getAuthRoleCatalogForPath(path), selectedRoles),
-      path,
+      mergeAuthRoleValues(getAuthRoleCatalogForPath(normalizedPath), selectedRoles),
+      normalizedPath,
     ).map((value) => ({
       value,
       checked: selectedRoleSet.has(value),
@@ -261,17 +289,12 @@ export const createAuthRolesRuntime = (ctx) => {
 
   
   ctx.syncAuthRolesForSelectedScope = syncAuthRolesForSelectedScope = () => {
-    const previousScopePath = state.authRoleVisibleScopePath;
-    const checkedVisibleRoles = getAuthRoleItems()
-      .filter((item) => item.checked)
-      .map((item) => item.value);
-
     syncAuthRoleSelectionMemoryFromVisibleCards();
     const scopeOption = getSelectedAuthPolicyScopeOption();
     const catalogPath = scopeOption?.path || buildApiPath();
-    migrateVisibleAuthRoleScope(previousScopePath, catalogPath, checkedVisibleRoles);
 
-    const scopedCheckedRoles = state.authSelectedRoles.filter((role) => isAuthRoleVisibleAtScopePath(role, catalogPath));
+    const scopedCheckedRoles = state.authSelectedRoles
+      .filter((role) => isAuthRoleSelectedRoleAvailableForScope(role, catalogPath));
     renderAuthRoles(createAuthRoleItemsWithCatalog(scopedCheckedRoles, catalogPath), {
       scopePath: catalogPath,
       updateSelectionMemory: false,
@@ -291,7 +314,12 @@ export const createAuthRolesRuntime = (ctx) => {
     const parentRoles = resolveParentAuthPolicyForPath(scopePath)?.policy?.roles || [];
     const parentRoleSet = new Set(parentRoles);
 
-    const localRoles = catalogRoles.filter((role) => !parentRoleSet.has(role));
+    const localRoles = catalogRoles.filter((role) => {
+      if (parentRoleSet.has(role)) return false;
+
+      const originPath = resolveAuthRoleOriginForScope(role, scopePath);
+      return !originPath || originPath === scopePath;
+    });
     if (localRoles.length > 0) policy.roles = localRoles;
 
     return policy;
@@ -304,14 +332,16 @@ export const createAuthRolesRuntime = (ctx) => {
     getCheckedRoleValuesFromItems,
     mergeAuthRoleValues,
     findAuthRoleOriginPathForScope,
+    resolveAuthRoleOriginForScope,
     rememberAuthSelectedRoles,
     forgetAuthSelectedRole,
     getAuthRoleCatalogForPath,
     isAuthRoleVisibleAtScopePath,
-    migrateVisibleAuthRoleScope,
+    ensureAuthPolicyRolesFromOrigins,
     stageAuthPolicyForScopeFromVisibleCards,
     syncAuthRoleSelectionMemoryFromVisibleCards,
     sortAuthRolesByScopeOrder,
+    isAuthRoleSelectedRoleAvailableForScope,
     getSelectedAuthRolesForScope,
     createAuthRoleItemsWithCatalog,
     syncAuthRolesForSelectedScope,

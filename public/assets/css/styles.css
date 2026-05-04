@@ -2418,6 +2418,22 @@ body.resizing-side-menu .side-menu-resizer::after {
   color: var(--veldoc-primary-text);
 }
 
+.auth-role-card.auth-role-inherited:has(input:checked) {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.auth-role-card.auth-role-inherited .auth-role-remove-button {
+  color: var(--color-text-muted);
+}
+
+.auth-role-card.auth-role-inherited .auth-role-remove-button:hover,
+.auth-role-card.auth-role-inherited .auth-role-remove-button:focus-visible {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+}
+
 .auth-role-card-label {
   align-items: center;
   display: inline-flex;
@@ -2790,23 +2806,23 @@ textarea[readonly] {
 }
 
 .row.error-row {
-  grid-template-columns: 78px 1fr 1.5fr 1.4fr 32px;
+  grid-template-columns: 18px 78px 1fr 1.5fr 1.4fr 32px;
 }
 
 .row.path-param-row {
-  grid-template-columns: 32px 1fr 0.8fr 64px 82px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 1fr 0.8fr 64px 82px 1fr 1.4fr 32px;
 }
 
 .row.query-param-row {
-  grid-template-columns: 1fr 0.8fr 64px 1fr 1fr 1.4fr 32px;
+  grid-template-columns: 18px 1fr 0.8fr 64px 1fr 1fr 1.4fr 32px;
 }
 
 .row.body-row {
-  grid-template-columns: 0.8fr 1fr 0.8fr 64px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 0.8fr 1fr 0.8fr 64px 1fr 1.4fr 32px;
 }
 
 .row.response-row {
-  grid-template-columns: 0.8fr 1fr 0.8fr 78px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 0.8fr 1fr 0.8fr 78px 1fr 1.4fr 32px;
 }
 
 .field-table {
@@ -2826,7 +2842,7 @@ textarea[readonly] {
 }
 
 .field-table-head.path-param-row {
-  grid-template-columns: 32px 1fr 0.8fr 64px 82px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 1fr 0.8fr 64px 82px 1fr 1.4fr 32px;
 }
 
 .field-table-head.compact {
@@ -2834,7 +2850,7 @@ textarea[readonly] {
 }
 
 .field-table-head.query-param-row {
-  grid-template-columns: 1fr 0.8fr 64px 1fr 1fr 1.4fr 32px;
+  grid-template-columns: 18px 1fr 0.8fr 64px 1fr 1fr 1.4fr 32px;
 }
 
 .row.action-param-row {
@@ -2846,15 +2862,15 @@ textarea[readonly] {
 }
 
 .field-table-head.body-row {
-  grid-template-columns: 0.8fr 1fr 0.8fr 64px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 0.8fr 1fr 0.8fr 64px 1fr 1.4fr 32px;
 }
 
 .field-table-head.response-row {
-  grid-template-columns: 0.8fr 1fr 0.8fr 78px 1fr 1.4fr 32px;
+  grid-template-columns: 18px 0.8fr 1fr 0.8fr 78px 1fr 1.4fr 32px;
 }
 
 .field-table-head.error-row {
-  grid-template-columns: 78px 1fr 1.5fr 1.4fr 32px;
+  grid-template-columns: 18px 78px 1fr 1.5fr 1.4fr 32px;
 }
 
 .field-table-head span {
@@ -2898,7 +2914,8 @@ textarea[readonly] {
   font-size: 12px;
   font-weight: 800;
   height: 38px;
-  width: 32px;
+  padding: 0;
+  width: 18px;
 }
 
 .drag-handle:active {

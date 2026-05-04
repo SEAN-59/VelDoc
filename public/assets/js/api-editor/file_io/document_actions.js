@@ -21,6 +21,7 @@ export const createDocumentActionsRuntime = (ctx) => {
   const clearValidationErrors = (...args) => ctx.clearValidationErrors(...args);
   const generateMarkdown = (...args) => ctx.generateMarkdown(...args);
   const getDirectoryPath = (...args) => ctx.getDirectoryPath(...args);
+  const getSelectedAuthPolicyScopeOption = (...args) => ctx.getSelectedAuthPolicyScopeOption(...args);
   const hasSaveDir = (...args) => ctx.hasSaveDir(...args);
   const hidePageLoading = (...args) => ctx.hidePageLoading(...args);
   const isBrowserFileSystemFile = (...args) => ctx.isBrowserFileSystemFile(...args);
@@ -70,6 +71,7 @@ export const createDocumentActionsRuntime = (ctx) => {
   const focusFileLocation = (...args) => ctx.focusFileLocation(...args);
   const setCurrentFile = (...args) => ctx.setCurrentFile(...args);
   const clearCurrentFile = (...args) => ctx.clearCurrentFile(...args);
+  const createAuthRoleItemsWithCatalog = (...args) => ctx.createAuthRoleItemsWithCatalog(...args);
 
   let
     saveMarkdown,
@@ -847,13 +849,24 @@ export const createDocumentActionsRuntime = (ctx) => {
   setSpecViewerMode(false);
   ctx.isAuthPolicyScopeManuallySelected = false;
   form.reset();
+  ctx.setFormValue('pathBase', '');
+  ctx.setFormValue('pathVersion', '');
+  ctx.setFormValue('pathSubCategory', '');
+  ctx.setFormValue('pathAction', '');
   clearSuccessStatusError();
   state.rows = structuredClone(defaultRows);
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
   clearCurrentFile();
   state.hasActiveDocument = true;
-  renderAuthRoles();
+  state.authSelectedRoles = [];
+  state.authSelectedRoleOrigins = {};
+  state.authRoleVisibleScopePath = '';
+  const authPolicyScopeOption = getSelectedAuthPolicyScopeOption();
+  renderAuthRoles(createAuthRoleItemsWithCatalog([], authPolicyScopeOption.path), {
+    scopePath: authPolicyScopeOption.path,
+    updateSelectionMemory: false,
+  });
   syncHeaderRowsWithControls();
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();
