@@ -15,15 +15,12 @@ export const createControllerRuntime = (ctx) => {
     emptyNewDocumentButton,
     filePanelBackdrop,
     filePanelRail,
-    floatingMenu,
     folderViewerButton,
     form,
     helpButton,
     helpDialog,
     helpDialogCloseButton,
     helpTopicButtons,
-    menuBackdrop,
-    menuButton,
     messageDialog,
     messageDialogCancelButton,
     messageDialogCloseButton,
@@ -62,7 +59,6 @@ export const createControllerRuntime = (ctx) => {
   const hideMessageDialog = (...args) => ctx.hideMessageDialog(...args);
   const isAuthRequired = (...args) => ctx.isAuthRequired(...args);
   const isDropdownOpen = (...args) => ctx.isDropdownOpen(...args);
-  const isFloatingMenuOpen = (...args) => ctx.isFloatingMenuOpen(...args);
   const loadDraft = (...args) => ctx.loadDraft(...args);
   const moveSideMenuResize = (...args) => ctx.moveSideMenuResize(...args);
   const openFilePanelFromRail = (...args) => ctx.openFilePanelFromRail(...args);
@@ -83,7 +79,6 @@ export const createControllerRuntime = (ctx) => {
   const scrollPageToTop = (...args) => ctx.scrollPageToTop(...args);
   const setDropdownOpen = (...args) => ctx.setDropdownOpen(...args);
   const setFileDrawerOpen = (...args) => ctx.setFileDrawerOpen(...args);
-  const setFloatingMenuOpen = (...args) => ctx.setFloatingMenuOpen(...args);
   const setHelpDialogOpen = (...args) => ctx.setHelpDialogOpen(...args);
   const setHelpTopic = (...args) => ctx.setHelpTopic(...args);
   const setPreviewOpen = (...args) => ctx.setPreviewOpen(...args);
@@ -95,14 +90,6 @@ export const createControllerRuntime = (ctx) => {
   const syncFilePanelLayoutMode = (...args) => ctx.syncFilePanelLayoutMode(...args);
   const syncHeaderRowsAndRefresh = (...args) => ctx.syncHeaderRowsAndRefresh(...args);
   const syncHeaderRowsWithControls = (...args) => ctx.syncHeaderRowsWithControls(...args);
-  const toggleFloatingMenu = (...args) => ctx.toggleFloatingMenu(...args);
-
-  const closeFloatingMenuOnOutsideAction = (event) => {
-    if (!isFloatingMenuOpen()) return;
-    const target = event.target;
-    if (floatingMenu?.contains(target) || menuButton?.contains(target)) return;
-    setFloatingMenuOpen(false);
-  };
 
   const togglePreviewPanel = () => {
     const isOpen = !appShell?.classList.contains('preview-closed');
@@ -169,17 +156,6 @@ export const createControllerRuntime = (ctx) => {
   };
 
   const bindShellControls = () => {
-    menuButton?.addEventListener('click', () => {
-      toggleFloatingMenu();
-    });
-    floatingMenu?.querySelectorAll('[data-page]').forEach((button) => {
-      button.addEventListener('click', () => {
-        setFloatingMenuOpen(false);
-      });
-    });
-    ['pointerdown', 'click'].forEach((eventName) => {
-      menuBackdrop?.addEventListener(eventName, () => setFloatingMenuOpen(false));
-    });
     filePanelRail?.addEventListener('click', openFilePanelFromRail);
     filePanelBackdrop?.addEventListener('click', () => setFileDrawerOpen(false));
     sideMenuResizer?.addEventListener('pointerdown', startSideMenuResize);
@@ -200,8 +176,6 @@ export const createControllerRuntime = (ctx) => {
   };
 
   const bindGlobalDismissControls = () => {
-    document.addEventListener('pointerdown', closeFloatingMenuOnOutsideAction, true);
-    document.addEventListener('click', closeFloatingMenuOnOutsideAction, true);
     document.addEventListener('pointerdown', (event) => {
       const target = event.target;
       if (target instanceof Element && target.closest('#saveSplitButton')) return;
@@ -370,11 +344,6 @@ export const createControllerRuntime = (ctx) => {
       if (event.key === 'Escape' && state.fileDrawerOpen) {
         setFileDrawerOpen(false);
         filePanelRail?.focus();
-        return;
-      }
-      if (event.key === 'Escape' && isFloatingMenuOpen()) {
-        setFloatingMenuOpen(false);
-        menuButton?.focus();
       }
     });
   };

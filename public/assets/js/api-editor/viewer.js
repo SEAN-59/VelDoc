@@ -71,6 +71,9 @@ export const createViewerRuntime = (ctx) => {
     moveViewerTabIndicator,
     renderViewerTabs,
     renderSpecViewer,
+    findSpecInViewerPayload,
+    scrollSpecCardIntoView,
+    openTreeMarkdownFileInViewer,
     openFolderViewer;
 
   const viewerTabResizeObserver = typeof ResizeObserver === 'function'
@@ -78,6 +81,24 @@ export const createViewerRuntime = (ctx) => {
         entries.forEach((entry) => refreshViewerTabIndicator?.(entry.target));
       })
     : null;
+
+  const scrollViewerTabIntoView = (container, activeButton) => {
+    if (!container || !activeButton) return;
+    const currentLeft = container.scrollLeft;
+    const viewportLeft = currentLeft;
+    const viewportRight = currentLeft + container.clientWidth;
+    const buttonLeft = activeButton.offsetLeft;
+    const buttonRight = buttonLeft + activeButton.offsetWidth;
+    const padding = 8;
+
+    if (buttonLeft < viewportLeft) {
+      container.scrollTo({ left: Math.max(0, buttonLeft - padding), behavior: 'smooth' });
+      return;
+    }
+    if (buttonRight > viewportRight) {
+      container.scrollTo({ left: buttonRight - container.clientWidth + padding, behavior: 'smooth' });
+    }
+  };
 
 
   ctx.markActiveTreeFile = markActiveTreeFile = () => {
@@ -124,7 +145,13 @@ export const createViewerRuntime = (ctx) => {
     label.textContent = node.label || node.name;
     fileButton.append(label);
 
-    fileButton.addEventListener('click', () => openTreeMarkdownFile(node.path, node.name));
+    fileButton.addEventListener('click', () => {
+      if (state.viewerMode) {
+        openTreeMarkdownFileInViewer(node.path, node.name);
+        return;
+      }
+      openTreeMarkdownFile(node.path, node.name);
+    });
     return fileButton;
   };
 
@@ -493,6 +520,8 @@ export const createViewerRuntime = (ctx) => {
     const successResponses = getSpecSuccessResponses(spec);
     const errorResponses = getSpecErrorResponses(spec);
     card.className = `spec-endpoint-card method-card-${method.toLowerCase()}`;
+    card.dataset.specRelativePath = spec.relativePath || '';
+    card.dataset.specPath = spec.path || '';
 
     const top = document.createElement('div');
     top.className = 'spec-card-top';
@@ -694,7 +723,7 @@ export const createViewerRuntime = (ctx) => {
     const activeButton = buttonsByItem.get(selectedItem) || container.querySelector('.viewer-tab');
     const previousButton = buttonsByItem.get(previousSelectedItem) || activeButton;
     const shouldAnimate = previousSelectedItem !== selectedItem && buttonsByItem.has(previousSelectedItem);
-    activeButton?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    scrollViewerTabIntoView(container, activeButton);
     moveViewerTabIndicator(container, activeButton, previousButton, { animate: shouldAnimate });
     observeViewerTabContainer(container);
     container.dataset.viewerSelectedItem = selectedItem;
@@ -719,10 +748,12 @@ export const createViewerRuntime = (ctx) => {
         : '';
     }
 
-    specViewerList.replaceChildren();
     if (specViewerEmpty) specViewerEmpty.hidden = specs.length > 0;
     if (specViewerFilters) specViewerFilters.hidden = specs.length === 0;
-    if (specs.length === 0) return;
+    if (specs.length === 0) {
+      specViewerList.replaceChildren();
+      return;
+    }
 
     const groupedSpecs = specs.reduce((commonGroups, spec) => {
       const common = viewerValue(spec.commonPath, '/');
@@ -759,6 +790,7 @@ export const createViewerRuntime = (ctx) => {
     });
 
     const selectedTagGroups = selectedVersionGroups.get(state.viewerVersion) || new Map();
+    const nextViewerList = document.createDocumentFragment();
     [...selectedTagGroups.entries()]
       .sort(([tagA], [tagB]) => compareViewerGroupName(tagA, tagB))
       .forEach(([tag, tagSpecs]) => {
@@ -780,8 +812,81 @@ export const createViewerRuntime = (ctx) => {
           heading.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
         });
         tagGroup.append(heading, tagContent);
-        specViewerList.append(tagGroup);
+        nextViewerList.append(tagGroup);
       });
+    specViewerList.replaceChildren(nextViewerList);
+  };
+
+  ctx.findSpecInViewerPayload = findSpecInViewerPayload = (payload = {}, relativePath = '', fileName = '') => {
+    const normalizedPath = String(relativePath ?? '').replaceAll('\\', '/');
+    const normalizedFileName = String(fileName ?? '').trim();
+    const specs = Array.isArray(payload.specs) ? payload.specs : [];
+    return specs.find((spec) => String(spec.relativePath ?? '').replaceAll('\\', '/') === normalizedPath)
+      || specs.find((spec) => normalizedFileName && spec.fileName === normalizedFileName)
+      || null;
+  };
+
+  ctx.scrollSpecCardIntoView = scrollSpecCardIntoView = (relativePath = '', apiPath = '') => {
+    if (!specViewerList) return;
+    window.requestAnimationFrame(() => {
+      const normalizedPath = String(relativePath ?? '').replaceAll('\\', '/');
+      const card = [...specViewerList.querySelectorAll('.spec-endpoint-card')].find((element) =>
+        element.dataset.specRelativePath === normalizedPath ||
+        (apiPath && element.dataset.specPath === apiPath),
+      );
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  ctx.openTreeMarkdownFileInViewer = openTreeMarkdownFileInViewer = async (path, fileName) => {
+    if (!state.fileTreeOpened) {
+      showWarningToast('뷰어를 열 수 없음', '홈에서 먼저 API 명세서 폴더를 열어주세요.');
+      setStatus('뷰어 열기 실패');
+      return;
+    }
+
+    try {
+      await refreshOpenedFileTree();
+      await loadAuthPoliciesForOpenedFolder();
+      const result = state.browserDirectoryHandle
+        ? await readBrowserSpecSummaries()
+        : await (async () => {
+            const response = await fetch('/api/spec-viewer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) {
+              const errorResult = await response.json().catch(() => ({}));
+              throw new Error(errorResult.message || '현재 파일 폴더의 명세서를 읽지 못했습니다.');
+            }
+            return response.json();
+          })();
+
+      if (Array.isArray(result.apiPaths)) {
+        state.folderApiPaths = normalizeFolderApiPaths(result.apiPaths);
+        state.folderSpecFiles = normalizeFolderSpecFiles(result.specFiles);
+        await syncAuthPoliciesWithOpenedFolder();
+      }
+
+      const selectedPath = String(path ?? '').replaceAll('\\', '/');
+      const spec = findSpecInViewerPayload(result, selectedPath, fileName);
+      if (!spec) throw new Error('선택한 API를 뷰어 목록에서 찾지 못했습니다.');
+
+      state.activeTreeFilePath = selectedPath;
+      state.viewerCommon = viewerValue(spec.commonPath, '/');
+      state.viewerVersion = viewerValue(spec.versionPath, '/');
+      renderSpecViewer(result);
+      setSpecViewerMode(true);
+      markActiveTreeFile();
+      scrollSpecCardIntoView(spec.relativePath || selectedPath, spec.path);
+      setStatus(`${spec.path || fileName} 명세서 표시`);
+    } catch (error) {
+      showErrorToast(
+        '명세서 표시 실패',
+        error instanceof Error ? error.message : '선택한 명세서를 뷰어에서 표시하지 못했습니다.',
+      );
+      setStatus('명세서 표시 실패');
+    }
   };
 
   ctx.openFolderViewer = openFolderViewer = async () => {
@@ -878,6 +983,9 @@ export const createViewerRuntime = (ctx) => {
     moveViewerTabIndicator,
     renderViewerTabs,
     renderSpecViewer,
+    findSpecInViewerPayload,
+    scrollSpecCardIntoView,
+    openTreeMarkdownFileInViewer,
     openFolderViewer,
   };
 };

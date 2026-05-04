@@ -60,7 +60,7 @@ export const createDefaultErrorFields = (preset = {}) => [
     key: 'field',
     type: 'string',
     nullable: 'Y',
-    example: 'email',
+    example: 'example',
     description: '오류 필드',
   },
   {
@@ -68,7 +68,7 @@ export const createDefaultErrorFields = (preset = {}) => [
     key: 'reason',
     type: 'string',
     nullable: 'Y',
-    example: '이미 사용 중인 이메일입니다.',
+    example: 'example',
     description: '오류 사유',
   },
 ];

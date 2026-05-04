@@ -449,20 +449,6 @@ body.home-page .help-topic-card.active {
   position: relative;
 }
 
-.menu-backdrop {
-  background: rgba(0, 0, 0, 0.42);
-  border: 0;
-  bottom: 0;
-  cursor: pointer;
-  left: 0;
-  padding: 0;
-  pointer-events: auto;
-  position: fixed;
-  right: 0;
-  top: 0;
-  z-index: 850;
-}
-
 .file-panel-backdrop {
   background: rgba(0, 0, 0, 0.42);
   border: 0;
@@ -605,97 +591,32 @@ h2,
 
 .brand-mark {
   align-items: center;
-  background: var(--veldoc-primary);
-  border: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--veldoc-primary);
   border-radius: 8px;
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: inline-flex;
   height: 36px;
   justify-content: center;
+  overflow: hidden;
   padding: 0;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
   width: 36px;
 }
 
-.brand-mark span {
-  background: #ffffff;
-  border-radius: 999px;
+.brand-mark img {
   display: block;
-  height: 2px;
-  width: 17px;
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
 }
 
-.brand-mark:hover {
-  background: var(--veldoc-primary-hover);
-}
-
-.brand-mark.active {
-  background: var(--veldoc-primary-hover);
-}
-
-.floating-menu {
-  background: var(--color-bg);
-  border-right: 1px solid var(--color-border);
-  bottom: 0;
-  box-shadow: 16px 0 36px rgba(0, 0, 0, 0.16);
-  display: grid;
-  gap: 6px;
-  grid-auto-rows: max-content;
-  left: 0;
-  min-width: 260px;
-  min-height: 100vh;
-  padding: 24px 18px 18px;
-  position: fixed;
-  top: 0;
-  transform: translateX(-105%);
-  transition: transform 180ms ease;
-  width: min(300px, 82vw);
-  z-index: 900;
-}
-
-.floating-menu.open {
-  transform: translateX(0);
-}
-
-.floating-menu-head {
-  border-bottom: 1px solid var(--color-border);
-  margin: 0 0 8px;
-  padding: 0 0 14px;
-}
-
-.floating-menu-head strong {
-  color: var(--color-text-primary);
-  font-size: 18px;
-}
-
-.page-nav {
-  display: grid;
-  gap: 6px;
-}
-
-.page-nav button {
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  min-height: 42px;
-  padding: 0 12px;
-  text-align: left;
-}
-
-.page-nav button:hover,
-.page-nav button:focus-visible {
-  background: var(--color-bg-secondary);
-  outline: 0;
-}
-
-.page-nav button.active,
-.page-nav button[aria-current="page"] {
+.brand-mark:hover,
+.brand-mark:focus-visible {
   background: var(--veldoc-primary-light);
-  color: var(--veldoc-primary-text);
+  border-color: var(--veldoc-primary);
+  box-shadow: 0 0 0 3px rgba(232, 109, 31, 0.16);
+  outline: 0;
 }
 
 .side-menu {

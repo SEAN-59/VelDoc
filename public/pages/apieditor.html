@@ -109,7 +109,6 @@
       </div>
     </div>
     <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
-    <button class="menu-backdrop" id="menuBackdrop" type="button" aria-label="메뉴 닫기" hidden></button>
     <button class="file-panel-backdrop" id="filePanelBackdrop" type="button" aria-label="파일 패널 닫기" hidden></button>
     <button class="file-panel-rail" id="filePanelRail" type="button" aria-label="파일 패널 열기" aria-controls="sideMenu" aria-expanded="false"></button>
     <button class="top-button" id="topButton" type="button" aria-label="맨 위로 이동">TOP</button>
@@ -136,29 +135,17 @@
       <section class="workspace" aria-label="API 명세 작성">
         <header class="topbar">
           <div class="brand-block">
-            <button
-              class="brand-mark menu-trigger"
+            <a
+              class="brand-mark home-mark"
               id="menuButton"
-              type="button"
-              aria-label="메뉴 열기"
-              aria-controls="floatingMenu"
-              aria-expanded="false"
+              href="../home.html"
+              aria-label="홈으로 이동"
             >
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
+              <img src="../assets/images/bordercoli.png" alt="" />
+            </a>
             <div class="brand-copy">
               <h1 id="workspaceTitle">API 명세서 작성기</h1>
             </div>
-          </div>
-          <div class="floating-menu" id="floatingMenu" aria-hidden="true" inert>
-            <div class="floating-menu-head">
-              <strong>메뉴</strong>
-            </div>
-            <nav class="page-nav" aria-label="페이지 이동">
-              <button class="active" type="button" data-page="api-spec" aria-current="page">API 명세서</button>
-            </nav>
           </div>
           <div class="actions">
             <button
