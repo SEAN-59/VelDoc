@@ -3,10 +3,6 @@
 </p>
 
 <p align="center">
-  <img src="./public/assets/images/icon.png" alt="VelDoc icon" width="92" />
-</p>
-
-<p align="center">
   개발 중 생기는 문서를 한곳에서 작성하고, Markdown으로 남기는 웹 기반 문서 도구
 </p>
 
