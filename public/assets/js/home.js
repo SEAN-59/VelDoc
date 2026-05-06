@@ -6,6 +6,7 @@ const WORKSPACE_REQUIRED_NOTICE = 'workspace-required';
 const VELDOC_WORKSPACE_DIR_NAME = 'veldoc';
 const API_EDITOR_DIR_NAME = 'api';
 const API_EDITOR_URL = './pages/apieditor.html';
+const TABLE_EDITOR_DIR_NAME = 'table';
 const HOME_EDITOR_DIRECTORIES = new Set(['wbs', 'srs', 'fsd', 'api', 'table']);
 
 const homeShell = document.querySelector('.home-shell');
@@ -473,6 +474,7 @@ const openApiEditor = async (event) => {
 };
 
 const openHomeEditorDirectory = async (event) => {
+  event.preventDefault();
   if (event.currentTarget?.disabled) return;
   const editorDirectoryName = event.currentTarget?.dataset?.editorDir || '';
   if (!editorDirectoryName || editorDirectoryName === API_EDITOR_DIR_NAME) return;
@@ -483,6 +485,9 @@ const openHomeEditorDirectory = async (event) => {
 
   try {
     await ensureHomeEditorWorkspace(editorDirectoryName);
+    if (editorDirectoryName === TABLE_EDITOR_DIR_NAME) {
+      window.location.href = event.currentTarget?.getAttribute('href') || './pages/tableeditor.html';
+    }
   } catch {
     setHomeFolderError(true, { shake: true });
     setHomeFolderStatus('작업 공간을 선택해주세요.');

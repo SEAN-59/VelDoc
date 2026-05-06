@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>DB 테이블 정의서 - VelDoc</title>
+    <link rel="icon" type="image/png" href="../assets/images/favicon.ico?v=20260430-1" sizes="32x32" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260504-table-editor-1" />
+  </head>
+  <body class="table-editor-page">
+    <div class="page-loading-overlay" id="tablePageLoadingOverlay" hidden>
+      <div class="loading-box" role="status" aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span id="tablePageLoadingText">처리 중...</span>
+      </div>
+    </div>
+    <div class="toast-container" id="tableToastContainer" aria-live="polite" aria-atomic="false"></div>
+    <button class="file-panel-backdrop" id="tableFilePanelBackdrop" type="button" aria-label="파일 패널 닫기" hidden></button>
+    <button class="file-panel-rail" id="tableFilePanelRail" type="button" aria-label="파일 패널 열기" aria-controls="tableSideMenu" aria-expanded="false"></button>
+    <button class="top-button" id="tableTopButton" type="button" aria-label="맨 위로 이동">TOP</button>
+    <div class="message-dialog-overlay" id="tableMessageDialog" role="alertdialog" aria-modal="true" aria-labelledby="tableMessageDialogTitle" aria-describedby="tableMessageDialogBody" hidden>
+      <div class="message-dialog-box">
+        <div class="message-dialog-head">
+          <h2 id="tableMessageDialogTitle">문서를 열 수 없음</h2>
+        </div>
+        <p id="tableMessageDialogBody">DB 테이블 정의서 양식과 맞지 않는 Markdown 파일입니다.</p>
+        <div class="message-dialog-actions">
+          <button class="button secondary" id="tableMessageDialogCancelButton" type="button" hidden>취소</button>
+          <button class="button primary" id="tableMessageDialogCloseButton" type="button">확인</button>
+        </div>
+      </div>
+    </div>
+    <div class="help-dialog-overlay" id="tableHelpDialog" role="dialog" aria-modal="true" aria-labelledby="tableHelpDialogTitle" hidden>
+      <div class="help-dialog-box">
+        <div class="help-dialog-head">
+          <h2 id="tableHelpDialogTitle">도우미</h2>
+          <button class="icon-button help-dialog-close" id="tableHelpDialogCloseButton" type="button" aria-label="도우미 닫기">×</button>
+        </div>
+        <div class="help-dialog-body">
+          <div class="help-topic-grid" role="tablist" aria-label="도우미 주제">
+            <button class="help-topic-card active" type="button" role="tab" aria-selected="true" data-table-help-topic="shortcuts">
+              <strong>단축키</strong>
+              <span>저장과 새 문서</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-table-help-topic="files">
+              <strong>저장 / 파일 위치</strong>
+              <span>폴더와 파일 흐름</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-table-help-topic="viewer">
+              <strong>문서 구조</strong>
+              <span>왼쪽 파일 구조</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-table-help-topic="guide">
+              <strong>작성 가이드</strong>
+              <span>테이블 입력 기준</span>
+            </button>
+          </div>
+          <div class="help-content">
+            <section class="help-section active" data-table-help-section="shortcuts">
+              <h3>단축키</h3>
+              <dl class="help-shortcut-list">
+                <div><dt>Cmd / Ctrl + S</dt><dd>현재 문서를 저장합니다.</dd></div>
+                <div><dt>Cmd / Ctrl + D</dt><dd>기존 파일 연결 없이 새 문서를 엽니다.</dd></div>
+                <div><dt>Opt / Alt + V</dt><dd>미리보기 패널을 열고 닫습니다.</dd></div>
+                <div><dt>Opt / Alt + R</dt><dd>입력 중인 내용을 처음 상태로 되돌립니다.</dd></div>
+                <div><dt>Esc</dt><dd>열린 메뉴나 팝업을 닫습니다.</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-table-help-section="files">
+              <h3>저장 / 파일 위치</h3>
+              <p>홈에서 먼저 작업 폴더를 선택해야 문서를 작성하고 저장할 수 있습니다.<br>같은 탭 세션에서는 새로고침해도 선택한 폴더를 다시 복구합니다.</p>
+              <dl class="help-file-list">
+                <div>
+                  <dt>*.md</dt>
+                  <dd>각 테이블 정의서의 본문 파일입니다.<br>DB 테이블 정의서는 선택한 폴더의 veldoc/table 안에 테이블명 기준 파일명으로 생성됩니다.</dd>
+                </div>
+              </dl>
+            </section>
+            <section class="help-section" data-table-help-section="viewer">
+              <h3>문서 구조</h3>
+              <p>왼쪽 파일 구조는 veldoc/table 폴더 안의 Markdown 문서를 보여줍니다.<br>뷰어에서는 저장된 테이블 정의서를 카드 형태로 한 번에 확인합니다.</p>
+            </section>
+            <section class="help-section" data-table-help-section="guide">
+              <h3>작성 가이드</h3>
+              <p>컬럼 정의에는 실제 DB 컬럼 계약을 작성합니다.<br>인덱스, 제약조건, 운영 정보는 필요한 항목만 채우면 됩니다.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <main class="app-shell preview-closed" id="tableAppShell" aria-label="DB 테이블 정의서">
+      <aside class="side-menu" id="tableSideMenu" aria-label="테이블 정의서 파일" aria-hidden="false">
+        <div class="side-menu-head">
+          <div class="side-menu-actions">
+            <button class="button secondary" id="tableViewerButton" type="button" aria-pressed="false">뷰어</button>
+          </div>
+        </div>
+        <nav class="file-tree" id="tableFileList" aria-label="테이블 정의서 파일 목록">
+          <p class="file-tree-empty">작업 공간을 확인하는 중입니다.</p>
+        </nav>
+        <button
+          class="side-menu-resizer"
+          id="tableSideMenuResizer"
+          type="button"
+          aria-label="파일 패널 크기 조절"
+          aria-valuemin="176"
+          aria-valuemax="280"
+          aria-valuenow="280"
+        ></button>
+      </aside>
+
+      <section class="workspace" aria-label="테이블 정의서 작성">
+        <header class="topbar">
+          <div class="brand-block">
+            <a class="brand-mark" href="../home.html" aria-label="홈으로 이동">
+              <img src="../assets/images/germanshepherd.png" alt="" />
+            </a>
+            <div class="brand-copy">
+              <h1 id="tableWorkspaceTitle">DB 테이블 정의서 작성기</h1>
+            </div>
+          </div>
+          <div class="actions">
+            <button
+              class="button secondary"
+              id="tablePreviewToggleButton"
+              type="button"
+              aria-controls="tablePreviewPanel"
+              aria-expanded="false"
+              data-tooltip="미리보기 (⌥/Alt + V)"
+            >
+              미리보기
+            </button>
+            <button class="button secondary" id="tableResetButton" type="button" data-tooltip="초기화 (⌥/Alt + R)">초기화</button>
+            <button class="button secondary" id="tableNewButton" type="button" data-tooltip="새문서 (⌘/Ctrl + D)">새문서</button>
+            <button class="button danger" id="tableDeleteButton" type="button" data-tooltip="현재 문서 삭제" disabled>삭제</button>
+            <div class="split-button" id="tableSaveSplitButton">
+              <button class="button primary split-main" id="tableSaveButton" type="button" data-tooltip="저장 (⌘/Ctrl + S)">저장</button>
+              <button
+                class="button primary split-arrow"
+                id="tableSaveMenuButton"
+                type="button"
+                aria-label="저장 메뉴"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="tableSaveDropdown"
+              >
+                ▾
+              </button>
+              <div class="split-menu" id="tableSaveDropdown" role="menu" hidden>
+                <button class="split-menu-item" id="tableSaveOverwriteButton" type="button" role="menuitem" data-save-action="overwrite">덮어쓰기</button>
+                <button class="split-menu-item" id="tableSaveNewButton" type="button" role="menuitem" data-save-action="new">새 파일 저장</button>
+              </div>
+            </div>
+            <button class="help-button" id="tableHelpButton" type="button" aria-label="도우미 열기" aria-haspopup="dialog" aria-expanded="false" aria-controls="tableHelpDialog">?</button>
+          </div>
+        </header>
+
+        <div class="viewer-transition-skeleton" id="tableViewerTransitionSkeleton" data-mode="viewer" aria-hidden="true" hidden>
+          <div class="transition-skeleton-editor">
+            <div class="editor-skeleton-grid">
+              <div class="editor-skeleton-card span-2 compact">
+                <span class="viewer-skeleton viewer-skeleton-title"></span>
+                <span class="viewer-skeleton viewer-skeleton-line"></span>
+              </div>
+              <div class="editor-skeleton-card span-2">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title medium"></span>
+                  <span class="viewer-skeleton viewer-skeleton-button"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+                <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+                <span class="viewer-skeleton viewer-skeleton-table-row short"></span>
+              </div>
+              <div class="editor-skeleton-card">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title short"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+                <span class="viewer-skeleton viewer-skeleton-field wide"></span>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+              </div>
+              <div class="editor-skeleton-card">
+                <div class="editor-skeleton-head">
+                  <span class="viewer-skeleton viewer-skeleton-title short"></span>
+                </div>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+                <span class="viewer-skeleton viewer-skeleton-field wide"></span>
+                <span class="viewer-skeleton viewer-skeleton-field"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="transition-skeleton-viewer">
+            <div class="viewer-skeleton-card viewer-head">
+              <div>
+                <span class="viewer-skeleton viewer-skeleton-title"></span>
+                <span class="viewer-skeleton viewer-skeleton-line medium"></span>
+              </div>
+              <span class="viewer-skeleton viewer-skeleton-badge"></span>
+            </div>
+            <div class="viewer-skeleton-card viewer-group">
+              <div class="viewer-skeleton-group-head">
+                <span class="viewer-skeleton viewer-skeleton-title medium"></span>
+                <span class="viewer-skeleton viewer-skeleton-badge short"></span>
+              </div>
+              <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+              <span class="viewer-skeleton viewer-skeleton-table-row"></span>
+              <span class="viewer-skeleton viewer-skeleton-table-row short"></span>
+            </div>
+          </div>
+        </div>
+
+        <section class="editor-empty-state" id="tableEmptyState" aria-live="polite" hidden>
+          <div class="editor-empty-icon" aria-hidden="true">
+            <img src="../assets/images/germanshepherd.png" alt="" />
+          </div>
+          <p class="editor-empty-title">선택된 문서가 없습니다</p>
+          <p class="editor-empty-desc">파일 구조에서 문서를 선택하거나 새문서를 눌러 DB 테이블 정의서 작성을 시작하세요.</p>
+          <button class="button primary editor-empty-action" id="tableEmptyNewButton" type="button">새문서</button>
+        </section>
+
+        <section class="spec-viewer" id="tableViewer" aria-label="DB 테이블 정의서 뷰어" hidden>
+          <div class="spec-viewer-head">
+            <div>
+              <h2>테이블 정의서 뷰어</h2>
+              <p>저장된 테이블 정의서를 한 번에 확인합니다.</p>
+            </div>
+            <span class="badge" id="tableViewerCount">0 Tables</span>
+          </div>
+          <div class="spec-viewer-list" id="tableViewerList"></div>
+          <p class="spec-viewer-empty" id="tableViewerEmpty" hidden>표시할 테이블 정의서가 없습니다.</p>
+        </section>
+
+        <form class="form-grid" id="tableEditorForm" autocomplete="off" hidden>
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div class="panel-title-inline">
+                <h2>기본 정보</h2>
+                <span class="table-section-help">
+                  <button
+                    class="help-button section-help-button"
+                    id="tableBasicHelpButton"
+                    type="button"
+                    aria-label="기본 정보 도우미"
+                    aria-expanded="false"
+                    aria-controls="tableBasicHelpPopover"
+                  >?</button>
+                  <span class="table-section-help-popover" id="tableBasicHelpPopover" role="tooltip" hidden>
+                    <button class="table-section-help-close" id="tableBasicHelpCloseButton" type="button" aria-label="기본 정보 도우미 닫기">×</button>
+                    <strong>기본 정보 작성 기준</strong>
+                    <span class="table-section-help-note">Table, Category, Entity는 필수입니다.<br />새 파일 저장 시 카테고리-엔티티-테이블.md 형식의 파일명으로 사용됩니다.</span>
+                    <dl class="table-section-help-list">
+                      <div><dt>Category</dt><dd>파일 구조에서 가장 먼저 묶을 큰 분류입니다. 예: member, order</dd></div>
+                      <div><dt>Entity</dt><dd>Category 안에서 테이블을 묶는 업무 대상입니다. 예: User, Payment</dd></div>
+                      <div><dt>Table</dt><dd>실제 DB 테이블명을 적습니다. 예: users, order_items</dd></div>
+                      <div><dt>Description</dt><dd>테이블의 목적, 주요 사용 흐름, 운영 메모를 한곳에 적습니다.</dd></div>
+                    </dl>
+                  </span>
+                </span>
+              </div>
+              <span class="badge">Required</span>
+            </div>
+            <div class="field-grid">
+              <label class="field wide">
+                <span>Table</span>
+                <input class="input" name="tableName" type="text" placeholder="예: users" />
+              </label>
+              <label class="field">
+                <span>Category</span>
+                <input class="input" name="category" type="text" placeholder="예: member" />
+              </label>
+              <label class="field">
+                <span>Entity</span>
+                <input class="input" name="entity" type="text" placeholder="예: User" />
+              </label>
+              <label class="field wide">
+                <span>Description</span>
+                <textarea class="input table-textarea" name="description" placeholder="테이블 설명과 메모"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div class="panel-title-inline">
+                <h2>컬럼 정의</h2>
+                <span class="table-section-help table-column-help">
+                  <button
+                    class="help-button section-help-button"
+                    id="tableColumnHelpButton"
+                    type="button"
+                    aria-label="컬럼 정의 도우미"
+                    aria-expanded="false"
+                    aria-controls="tableColumnHelpPopover"
+                  >?</button>
+                  <span class="table-section-help-popover table-column-help-popover" id="tableColumnHelpPopover" role="tooltip" hidden>
+                    <button class="table-section-help-close table-column-help-close" id="tableColumnHelpCloseButton" type="button" aria-label="컬럼 정의 도우미 닫기">×</button>
+                    <strong>컬럼 정의 작성 기준</strong>
+                    <dl class="table-section-help-list table-column-help-list">
+                      <div><dt>한글명</dt><dd>업무에서 부르는 컬럼 이름입니다.<br />화면, 기획서, 엑셀 명칭을 맞출 때 씁니다.</dd></div>
+                      <div><dt>Column</dt><dd>실제 DB 컬럼명입니다.<br />인덱스, 제약조건, SQL 생성에서 이 값을 기준으로 참조합니다.</dd></div>
+                      <div><dt>Type</dt><dd>DB 컬럼 타입입니다. 예: varchar, bigint, timestamp</dd></div>
+                      <div><dt>Length</dt><dd>문자열 길이나 숫자 자릿수처럼 타입에 필요한 크기입니다. 예: 255</dd></div>
+                      <div><dt>PK / FK</dt><dd>기본키와 외래키 여부입니다.<br />복합키나 FK 상세 관계는 제약조건에 적습니다.</dd></div>
+                      <div><dt>Nullable</dt><dd>NULL 허용 여부입니다.<br />체크하면 NULL을 허용하는 컬럼으로 기록됩니다.</dd></div>
+                      <div><dt>Unique</dt><dd>단일 컬럼 중복 불가 여부입니다.<br />여러 컬럼 조합의 Unique는 제약조건에 적습니다.</dd></div>
+                      <div><dt>Default</dt><dd>DB 기본값입니다. 예: now(), 0, false</dd></div>
+                      <div><dt>Example</dt><dd>문서에서 참고할 값 예시입니다. 예: user@example.com</dd></div>
+                      <div><dt>설명</dt><dd>컬럼의 의미와 사용 목적을 적습니다.</dd></div>
+                      <div><dt>규칙</dt><dd>입력 형식, 허용 범위, 코드 규칙을 적습니다.</dd></div>
+                      <div><dt>메모</dt><dd>마이그레이션, 운영 주의사항, 예외 케이스를 적습니다.</dd></div>
+                    </dl>
+                  </span>
+                </span>
+              </div>
+              <button class="mini-button" type="button" data-add-table-row="columns">컬럼 추가</button>
+            </div>
+            <div class="rows table-definition-rows" id="tableColumnRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div class="panel-title-inline">
+                <h2>인덱스 정의</h2>
+                <span class="table-section-help">
+                  <button
+                    class="help-button section-help-button"
+                    id="tableIndexHelpButton"
+                    type="button"
+                    aria-label="인덱스 정의 도우미"
+                    aria-expanded="false"
+                    aria-controls="tableIndexHelpPopover"
+                  >?</button>
+                  <span class="table-section-help-popover" id="tableIndexHelpPopover" role="tooltip" hidden>
+                    <button class="table-section-help-close" id="tableIndexHelpCloseButton" type="button" aria-label="인덱스 정의 도우미 닫기">×</button>
+                    <strong>인덱스 정의 작성 기준</strong>
+                    <span class="table-section-help-note">인덱스는 자주 조회하거나 정렬하는 컬럼의 검색 속도를 높이기 위해 작성합니다.</span>
+                    <dl class="table-section-help-list">
+                      <div><dt>작성 시점</dt><dd>WHERE, JOIN, ORDER BY에 자주 쓰이는 컬럼이 있을 때 작성합니다.</dd></div>
+                      <div><dt>Index Name</dt><dd>DB에 생성할 인덱스 이름입니다. 예: idx_users_email</dd></div>
+                      <div><dt>Columns</dt><dd>컬럼 정의의 Column 값을 선택합니다.<br />입력하면 자동완성으로 후보가 나오고, 여러 컬럼은 칩으로 묶입니다.</dd></div>
+                      <div><dt>Unique</dt><dd>중복을 막는 인덱스인지 표시합니다.<br />단순 중복 방지인지 조회 성능 목적 인덱스인지 구분할 때 씁니다.</dd></div>
+                      <div><dt>Sort</dt><dd>정렬 방향이 SQL에 필요할 때 적습니다. 예: created_at DESC</dd></div>
+                      <div><dt>설명</dt><dd>어떤 조회, 화면, 배치 작업을 위해 필요한지 적습니다.</dd></div>
+                      <div><dt>메모</dt><dd>특수 인덱스, 운영 주의사항, 성능 메모를 적습니다.</dd></div>
+                    </dl>
+                  </span>
+                </span>
+              </div>
+              <button class="mini-button" type="button" data-add-table-row="indexes">인덱스 추가</button>
+            </div>
+            <div class="rows table-definition-rows" id="tableIndexRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div class="panel-title-inline">
+                <h2>제약조건</h2>
+                <span class="table-section-help">
+                  <button
+                    class="help-button section-help-button"
+                    id="tableConstraintHelpButton"
+                    type="button"
+                    aria-label="제약조건 도우미"
+                    aria-expanded="false"
+                    aria-controls="tableConstraintHelpPopover"
+                  >?</button>
+                  <span class="table-section-help-popover" id="tableConstraintHelpPopover" role="tooltip" hidden>
+                    <button class="table-section-help-close" id="tableConstraintHelpCloseButton" type="button" aria-label="제약조건 도우미 닫기">×</button>
+                    <strong>제약조건 작성 기준</strong>
+                    <span class="table-section-help-note">컬럼 하나로 표현하기 어려운 관계, 복합키, 복합 유니크, 조건 규칙을 기록합니다.<br />요약 행은 종류 / 제약명 / 설명만 보이고, 화살표를 누르면 상세 입력이 열립니다.</span>
+                    <span class="table-section-help-subtitle">항목 설명</span>
+                    <dl class="table-section-help-list">
+                      <div><dt>종류</dt><dd>FK, Composite PK, Unique, Check 중 하나를 선택합니다.<br />선택하면 필요한 상세 입력 항목이 아래에 나타납니다.</dd></div>
+                      <div><dt>제약명</dt><dd>DB에 등록할 제약조건 이름입니다. 예: fk_orders_user_id</dd></div>
+                      <div><dt>설명</dt><dd>요약 행에 함께 보이는 짧은 설명입니다.<br />왜 필요한 제약인지 적습니다.</dd></div>
+                      <div><dt>대상 컬럼</dt><dd>현재 테이블에서 제약이 걸리는 Column입니다.<br />컬럼 정의에 있는 값만 선택할 수 있고, 여러 개면 칩으로 묶어서 관리합니다.</dd></div>
+                      <div><dt>참조 테이블</dt><dd>FK일 때 참조하는 대상 테이블입니다. 예: users</dd></div>
+                      <div><dt>참조 컬럼</dt><dd>FK일 때 참조하는 대상 컬럼입니다.<br />쉼표 앞뒤 공백은 정리되어 id,user_id와 id, user_id 모두 id, user_id로 저장됩니다.</dd></div>
+                      <div><dt>On Update</dt><dd>FK 참조값이 바뀔 때의 정책입니다.<br />화살표로 기본 옵션을 고르고, Custom은 같은 필드 안에서 직접 입력합니다.</dd></div>
+                      <div><dt>On Delete</dt><dd>FK 참조 데이터가 삭제될 때의 정책입니다.<br />화살표로 기본 옵션을 고르고, Custom은 같은 필드 안에서 직접 입력합니다.</dd></div>
+                      <div><dt>조건</dt><dd>Check일 때 값의 허용 범위나 조건식을 적습니다. 예: amount &gt; 0</dd></div>
+                      <div><dt>메모</dt><dd>마이그레이션, 운영 주의사항, DB별 차이처럼 설명과 분리해 둘 내용을 적습니다.</dd></div>
+                    </dl>
+                    <span class="table-section-help-subtitle">종류별 사용법</span>
+                    <dl class="table-section-help-list">
+                      <div><dt>FK</dt><dd>현재 테이블 컬럼이 다른 테이블 컬럼을 참조할 때 씁니다.<br />복합 FK는 대상 컬럼과 참조 컬럼을 같은 순서로 적고, 서로 다른 참조 관계가 여러 개면 제약조건을 여러 개 만듭니다.</dd></div>
+                      <div><dt>Composite PK</dt><dd>두 개 이상의 컬럼을 묶어 하나의 기본키로 사용할 때 씁니다.</dd></div>
+                      <div><dt>Unique</dt><dd>여러 컬럼 조합의 중복을 막을 때 씁니다.<br />단일 컬럼 중복 금지는 컬럼 정의의 Unique로도 충분합니다.</dd></div>
+                      <div><dt>Check</dt><dd>값의 범위나 형식 같은 조건을 DB 레벨에서 제한할 때 씁니다.</dd></div>
+                    </dl>
+                    <span class="table-section-help-subtitle">FK 액션 옵션</span>
+                    <dl class="table-section-help-list">
+                      <div><dt>NO ACTION</dt><dd>DB 기본 검사 시점에 따라 참조 무결성을 확인합니다.</dd></div>
+                      <div><dt>RESTRICT</dt><dd>참조 중인 데이터의 변경이나 삭제를 즉시 막습니다.</dd></div>
+                      <div><dt>CASCADE</dt><dd>부모 데이터 변경이나 삭제를 자식 데이터에도 전파합니다.</dd></div>
+                      <div><dt>SET NULL</dt><dd>부모 데이터가 바뀌거나 삭제되면 자식 컬럼을 NULL로 바꿉니다.</dd></div>
+                      <div><dt>SET DEFAULT</dt><dd>부모 데이터가 바뀌거나 삭제되면 자식 컬럼을 기본값으로 바꿉니다.</dd></div>
+                      <div><dt>Custom</dt><dd>DB나 프로젝트에서 쓰는 별도 정책명을 직접 입력합니다.</dd></div>
+                    </dl>
+                  </span>
+                </span>
+              </div>
+              <button class="mini-button" type="button" data-add-table-row="constraints">제약조건 추가</button>
+            </div>
+            <div class="rows table-definition-rows" id="tableConstraintRows"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>운영 / 관리 정보</h2>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span>생성일시 컬럼</span>
+                <input class="input" name="createdAtColumn" type="text" placeholder="예: created_at" />
+              </label>
+              <label class="field">
+                <span>수정일시 컬럼</span>
+                <input class="input" name="updatedAtColumn" type="text" placeholder="예: updated_at" />
+              </label>
+              <label class="field">
+                <span>삭제 방식</span>
+                <select class="input" name="deletePolicy">
+                  <option value="">미정</option>
+                  <option value="사용 안함">사용 안함</option>
+                  <option value="물리 삭제">물리 삭제</option>
+                  <option value="논리 삭제">논리 삭제</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>삭제일시 컬럼</span>
+                <input class="input" name="deletedAtColumn" type="text" placeholder="논리 삭제 시 입력" disabled />
+              </label>
+              <label class="field">
+                <span>보관 / 파기 기준</span>
+                <input class="input" name="retention" type="text" placeholder="예: 탈퇴 후 30일 보관 후 파기" />
+              </label>
+              <label class="field">
+                <span>개인정보 / 민감정보</span>
+                <select class="input" name="sensitiveData">
+                  <option value="">미정</option>
+                  <option value="포함">포함</option>
+                  <option value="미포함">미포함</option>
+                </select>
+              </label>
+              <label class="field wide">
+                <span>운영 메모</span>
+                <textarea class="input table-textarea" name="operationMemo" placeholder="백업, 파기, 감사, 배치 처리 같은 운영 주의사항"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>SQL</h2>
+            </div>
+            <pre class="table-generated-sql" id="tableGeneratedSql">컬럼 정의를 추가하면 SQL이 자동으로 생성됩니다.</pre>
+          </section>
+        </form>
+      </section>
+
+      <aside class="preview-panel" id="tablePreviewPanel" aria-label="마크다운 미리보기" aria-hidden="true" inert>
+        <div class="preview-head">
+          <div>
+            <p class="eyebrow">Markdown</p>
+            <h2>미리보기</h2>
+          </div>
+          <div class="preview-actions">
+            <span id="tableStatusText" class="status">자동 저장됨</span>
+            <button class="button secondary compact-button" id="tableCopyButton" type="button">복사</button>
+          </div>
+        </div>
+        <pre id="tablePreview" class="preview"></pre>
+      </aside>
+    </main>
+    <script type="module" src="../assets/js/table_editor.js?v=20260504-1"></script>
+  </body>
+</html>

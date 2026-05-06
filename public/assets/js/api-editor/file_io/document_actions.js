@@ -834,13 +834,24 @@ export const createDocumentActionsRuntime = (ctx) => {
   setSpecViewerMode(false);
   ctx.isAuthPolicyScopeManuallySelected = false;
   form.reset();
+  ctx.setFormValue('pathBase', '');
+  ctx.setFormValue('pathVersion', '');
+  ctx.setFormValue('pathSubCategory', '');
+  ctx.setFormValue('pathAction', '');
   clearValidationErrors();
   state.rows = structuredClone(defaultRows);
   state.successResponses = structuredClone(defaultSuccessResponses);
   state.activeSuccessResponseIndex = 0;
   state.errorResponses = structuredClone(defaultErrorResponses);
   state.activeErrorResponseIndex = 0;
-  renderAuthRoles();
+  state.authSelectedRoles = [];
+  state.authSelectedRoleOrigins = {};
+  state.authRoleVisibleScopePath = '';
+  const authPolicyScopeOption = getSelectedAuthPolicyScopeOption();
+  renderAuthRoles(createAuthRoleItemsWithCatalog([], authPolicyScopeOption.path), {
+    scopePath: authPolicyScopeOption.path,
+    updateSelectionMemory: false,
+  });
   syncHeaderRowsWithControls({ allowAuthorization: true });
   Object.keys(rowDefinitions).filter((type) => type !== 'actionPathParams').forEach(renderRows);
   renderSuccessStatusTabs();

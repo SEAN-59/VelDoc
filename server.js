@@ -20,11 +20,13 @@ const authPolicyFileName = 'veldoc-auth-policies.json';
 const authPolicyVersion = 2;
 const veldocWorkspaceDirectoryName = 'veldoc';
 const apiEditorDirectoryName = 'api';
-const homeEditorDirectoryNames = new Set(['wbs', 'srs', 'fsd', apiEditorDirectoryName, 'table']);
+const tableEditorDirectoryName = 'table';
+const homeEditorDirectoryNames = new Set(['wbs', 'srs', 'fsd', apiEditorDirectoryName, tableEditorDirectoryName]);
 
 const staticPathAliases = new Map([
   ['/index.html', '/home.html'],
   ['/apieditor.html', '/pages/apieditor.html'],
+  ['/tableeditor.html', '/pages/tableeditor.html'],
 ]);
 
 const mimeTypes = {
@@ -786,6 +788,46 @@ const readFileTreePayload = async (directory) => {
   };
 };
 
+const collectEditorMarkdownFiles = async (directory, relativeDir = '', depth = 0, counter = { count: 0 }) => {
+  if (depth > 8 || counter.count >= 1500) return [];
+
+  let entries = [];
+  try {
+    entries = await readdir(resolve(directory, relativeDir), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const files = [];
+  for (const entry of entries
+    .filter((item) => !item.name.startsWith('.'))
+    .sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name, 'ko');
+    })) {
+    if (counter.count >= 1500) break;
+
+    const entryRelativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+    const entryPath = resolve(directory, entryRelativePath);
+    if (!isInside(directory, entryPath)) continue;
+
+    if (entry.isDirectory()) {
+      files.push(...(await collectEditorMarkdownFiles(directory, entryRelativePath, depth + 1, counter)));
+      continue;
+    }
+
+    if (entry.isFile() && isMarkdownFile(entryPath)) {
+      counter.count += 1;
+      files.push({
+        fileName: entry.name,
+        path: entryRelativePath,
+      });
+    }
+  }
+
+  return files;
+};
+
 const fileExists = async (filePath) => {
   try {
     await stat(filePath);
@@ -1002,10 +1044,8 @@ const server = createServer(async (request, response) => {
       const { editorRoot } = await ensureVelDocEditorWorkspace(selectedWorkspaceRoot, editorName);
 
       sessionState.workspaceRoot = selectedWorkspaceRoot;
-      if (editorName === apiEditorDirectoryName) {
-        sessionState.fileTreeRoot = editorRoot;
-        sessionState.isFileTreeRootOpened = true;
-      }
+      sessionState.fileTreeRoot = editorRoot;
+      sessionState.isFileTreeRootOpened = true;
 
       sendJson(response, 200, {
         ok: true,
@@ -1016,6 +1056,21 @@ const server = createServer(async (request, response) => {
         workspaceRoot: sessionState.workspaceRoot,
         rootPath: editorRoot,
         saveDir: editorRoot,
+        files: await collectEditorMarkdownFiles(editorRoot),
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/editor-file-list') {
+      const { fileTreeRoot } = sessionState;
+      if (!fileTreeRoot) {
+        sendJson(response, 409, { ok: false, message: '먼저 문서 폴더를 열어주세요.' });
+        return;
+      }
+
+      sendJson(response, 200, {
+        ok: true,
+        files: await collectEditorMarkdownFiles(fileTreeRoot),
       });
       return;
     }
