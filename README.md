@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://veldoc.ipstein.myds.me/">https://veldoc.ipstein.myds.me/</a>
+  <strong><a href="https://veldoc.ipstein.myds.me/">VelDoc 이용하기</a></strong>
 </p>
 
 # VelDoc
