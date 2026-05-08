@@ -7,7 +7,10 @@ const VELDOC_WORKSPACE_DIR_NAME = 'veldoc';
 const API_EDITOR_DIR_NAME = 'api';
 const API_EDITOR_URL = './pages/apieditor.html';
 const TABLE_EDITOR_DIR_NAME = 'table';
-const HOME_EDITOR_DIRECTORIES = new Set(['wbs', 'srs', 'fsd', 'api', 'table']);
+const WBS_EDITOR_DIR_NAME = 'wbs';
+const WBS_EDITOR_URL = './pages/wbseditor.html';
+const SCENARIO_EDITOR_DIR_NAME = 'scenario';
+const HOME_EDITOR_DIRECTORIES = new Set([WBS_EDITOR_DIR_NAME, 'srs', 'fsd', 'api', 'table', SCENARIO_EDITOR_DIR_NAME]);
 
 const homeShell = document.querySelector('.home-shell');
 const homeFolderOpenButton = document.querySelector('#homeFolderOpenButton');
@@ -485,8 +488,16 @@ const openHomeEditorDirectory = async (event) => {
 
   try {
     await ensureHomeEditorWorkspace(editorDirectoryName);
+    if (editorDirectoryName === WBS_EDITOR_DIR_NAME) {
+      window.location.href = event.currentTarget?.getAttribute('href') || WBS_EDITOR_URL;
+      return;
+    }
     if (editorDirectoryName === TABLE_EDITOR_DIR_NAME) {
       window.location.href = event.currentTarget?.getAttribute('href') || './pages/tableeditor.html';
+      return;
+    }
+    if (editorDirectoryName === SCENARIO_EDITOR_DIR_NAME) {
+      showHomeToast('success', '테스트 시나리오', 'veldoc/scenario 폴더를 준비했습니다.');
     }
   } catch {
     setHomeFolderError(true, { shake: true });

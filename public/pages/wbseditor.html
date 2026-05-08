@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>WBS-VelDoc</title>
+    <link rel="icon" type="image/png" href="../assets/images/favicon.ico?v=20260430-1" sizes="32x32" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260508-wbs-file-list-1" />
+  </head>
+  <body class="wbs-editor-page">
+    <div class="toast-container" id="wbsToastContainer" aria-live="polite" aria-atomic="false"></div>
+    <button class="file-panel-backdrop" id="wbsFilePanelBackdrop" type="button" aria-label="파일 패널 닫기" hidden></button>
+    <button class="file-panel-rail" id="wbsFilePanelRail" type="button" aria-label="파일 패널 열기" aria-controls="wbsSideMenu" aria-expanded="false"></button>
+    <button class="top-button" id="wbsTopButton" type="button" aria-label="맨 위로 이동">TOP</button>
+    <div class="message-dialog-overlay" id="wbsMessageDialog" role="alertdialog" aria-modal="true" aria-labelledby="wbsMessageDialogTitle" aria-describedby="wbsMessageDialogBody" hidden>
+      <div class="message-dialog-box">
+        <div class="message-dialog-head">
+          <h2 id="wbsMessageDialogTitle">문서 삭제</h2>
+        </div>
+        <p id="wbsMessageDialogBody">현재 열린 WBS 문서를 완전히 삭제합니다.<br>휴지통으로 이동하지 않으며 되돌릴 수 없습니다.</p>
+        <div class="message-dialog-actions">
+          <button class="button secondary" id="wbsMessageDialogCancelButton" type="button">취소</button>
+          <button class="button danger" id="wbsMessageDialogConfirmButton" type="button">삭제</button>
+        </div>
+      </div>
+    </div>
+    <div class="help-dialog-overlay" id="wbsHelpDialog" role="dialog" aria-modal="true" aria-labelledby="wbsHelpDialogTitle" hidden>
+      <div class="help-dialog-box">
+        <div class="help-dialog-head">
+          <h2 id="wbsHelpDialogTitle">도우미</h2>
+          <button class="icon-button help-dialog-close" id="wbsHelpDialogCloseButton" type="button" aria-label="도우미 닫기">×</button>
+        </div>
+        <div class="help-dialog-body">
+          <div class="help-topic-grid" role="tablist" aria-label="WBS 도우미 주제">
+            <button class="help-topic-card active" type="button" role="tab" aria-selected="true" data-wbs-help-topic="shortcuts">
+              <strong>단축키</strong>
+              <span>저장과 새 문서</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-wbs-help-topic="files">
+              <strong>저장 / 파일 위치</strong>
+              <span>폴더와 파일 흐름</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-wbs-help-topic="guide">
+              <strong>작성 가이드</strong>
+              <span>작업 분해 기준</span>
+            </button>
+            <button class="help-topic-card" type="button" role="tab" aria-selected="false" data-wbs-help-topic="status">
+              <strong>날짜 / 진행률</strong>
+              <span>자동 계산 기준</span>
+            </button>
+          </div>
+          <div class="help-content">
+            <section class="help-section active" data-wbs-help-section="shortcuts">
+              <h3>단축키</h3>
+              <dl class="help-shortcut-list">
+                <div><dt>Cmd / Ctrl + S</dt><dd>현재 문서를 저장합니다.</dd></div>
+                <div><dt>Cmd / Ctrl + D</dt><dd>기존 파일 연결 없이 새 문서를 엽니다.</dd></div>
+                <div><dt>Opt / Alt + V</dt><dd>미리보기 패널을 열고 닫습니다.</dd></div>
+                <div><dt>Opt / Alt + R</dt><dd>입력 중인 내용을 처음 상태로 되돌립니다.</dd></div>
+                <div><dt>Esc</dt><dd>열린 메뉴나 팝업을 닫습니다.</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-wbs-help-section="files">
+              <h3>저장 / 파일 위치</h3>
+              <p>홈에서 먼저 작업 폴더를 선택해야 WBS 문서를 작성하고 저장할 수 있습니다.<br>WBS 문서는 선택한 폴더의 veldoc/wbs 안에 Markdown으로 저장됩니다.</p>
+              <dl class="help-file-list">
+                <div><dt>파일 목록</dt><dd>왼쪽 파일 목록에서 저장된 WBS 문서를 선택해 다시 열 수 있습니다.</dd></div>
+                <div><dt>파일명</dt><dd>새 파일은 프로젝트명-내부코드-wbs.md 형식으로 저장됩니다.</dd></div>
+                <div><dt>중복</dt><dd>같은 이름의 파일이 이미 있으면 저장하지 않고 토스트로 알려줍니다.</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-wbs-help-section="guide">
+              <h3>작성 가이드</h3>
+              <p>WBS는 프로젝트 목표를 실제 수행 가능한 작업 단위로 나누는 문서입니다.<br>프로젝트명, 내부 코드, 버전, 담당자는 필수로 입력합니다.<br>작업 목록은 1개 이상 필요합니다.</p>
+              <dl class="help-file-list">
+                <div><dt>WBS 번호</dt><dd>1, 1.1, 1.1.1처럼 숫자와 점으로만 작성합니다.</dd></div>
+                <div><dt>작업</dt><dd>실제로 수행할 일을 명확한 동사나 산출물 중심으로 적습니다.</dd></div>
+                <div><dt>들여쓰기</dt><dd>WBS 번호의 깊이에 맞춰 카드 위치가 자동으로 정리됩니다.</dd></div>
+              </dl>
+            </section>
+            <section class="help-section" data-wbs-help-section="status">
+              <h3>날짜 / 진행률</h3>
+              <dl class="help-file-list">
+                <div><dt>작성일</dt><dd>새 문서를 만들 때 자동으로 들어갑니다.</dd></div>
+                <div><dt>수정일</dt><dd>저장할 때마다 저장 날짜로 자동 변경됩니다.</dd></div>
+                <div><dt>기간</dt><dd>시작일과 종료일을 포함해 자동 계산합니다.</dd></div>
+                <div><dt>진행률</dt><dd>오늘 날짜 기준으로 자동 계산하고 100%를 넘기지 않습니다.</dd></div>
+              </dl>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <main class="app-shell wbs-app-shell preview-closed" id="wbsAppShell" aria-label="WBS">
+      <aside class="side-menu wbs-side-menu" id="wbsSideMenu" aria-label="WBS 파일 목록" aria-hidden="false">
+        <div class="side-menu-head">
+          <div class="wbs-side-title">
+            <strong>WBS 문서</strong>
+            <span>veldoc/wbs</span>
+          </div>
+        </div>
+        <nav class="file-tree" id="wbsFileList" aria-label="WBS 파일 목록">
+          <p class="file-tree-empty">작업 공간을 확인하는 중입니다.</p>
+        </nav>
+        <button
+          class="side-menu-resizer"
+          id="wbsSideMenuResizer"
+          type="button"
+          aria-label="파일 패널 크기 조절"
+          aria-valuemin="176"
+          aria-valuemax="280"
+          aria-valuenow="280"
+        ></button>
+      </aside>
+
+      <section class="workspace" aria-label="WBS 작성">
+        <header class="topbar">
+          <div class="brand-block">
+            <a class="brand-mark" href="../home.html" aria-label="홈으로 이동">
+              <img src="../assets/images/welshcorgi.png" alt="" />
+            </a>
+            <div class="brand-copy">
+              <h1 id="wbsWorkspaceTitle">WBS 작성기</h1>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="button secondary" id="wbsPreviewToggleButton" type="button" aria-controls="wbsPreviewPanel" aria-expanded="false" data-tooltip="미리보기 (⌥/Alt + V)">미리보기</button>
+            <button class="button secondary" id="wbsResetButton" type="button" data-tooltip="초기화 (⌥/Alt + R)">초기화</button>
+            <button class="button secondary" id="wbsNewButton" type="button" data-tooltip="새문서 (⌘/Ctrl + D)">새문서</button>
+            <button class="button danger" id="wbsDeleteButton" type="button" data-tooltip="현재 문서 삭제" disabled>삭제</button>
+            <div class="split-button" id="wbsSaveSplitButton">
+              <button class="button primary split-main" id="wbsSaveButton" type="button" data-tooltip="저장 (⌘/Ctrl + S)">저장</button>
+              <button class="button primary split-arrow" id="wbsSaveMenuButton" type="button" aria-label="저장 메뉴" aria-haspopup="menu" aria-expanded="false" aria-controls="wbsSaveDropdown">▾</button>
+              <div class="split-menu" id="wbsSaveDropdown" role="menu" hidden>
+                <button class="split-menu-item" id="wbsSaveOverwriteButton" type="button" role="menuitem" data-save-action="overwrite">덮어쓰기</button>
+                <button class="split-menu-item" id="wbsSaveNewButton" type="button" role="menuitem" data-save-action="new">새 파일 저장</button>
+              </div>
+            </div>
+            <button class="help-button" id="wbsHelpButton" type="button" aria-label="도우미 열기" aria-haspopup="dialog" aria-expanded="false" aria-controls="wbsHelpDialog">?</button>
+          </div>
+        </header>
+
+        <section class="editor-empty-state" id="wbsEmptyState" aria-live="polite">
+          <div class="editor-empty-icon" aria-hidden="true">
+            <img src="../assets/images/welshcorgi.png" alt="" />
+          </div>
+          <p class="editor-empty-title">선택된 WBS 문서가 없습니다</p>
+          <p class="editor-empty-desc">파일 목록에서 문서를 선택하거나 새문서를 눌러 WBS 작성을 시작하세요.</p>
+          <button class="button primary editor-empty-action" id="wbsEmptyNewButton" type="button">새문서</button>
+        </section>
+
+        <form class="form-grid" id="wbsEditorForm" autocomplete="off" hidden>
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>기본 정보</h2>
+              <span class="badge">WBS</span>
+            </div>
+            <div class="field-grid three">
+              <label class="field">
+                <span>프로젝트명 <span class="table-required-marker" aria-label="필수">*</span></span>
+                <input class="input" name="projectName" type="text" placeholder="예: VelDoc 문서 에디터 구축" required />
+              </label>
+              <label class="field">
+                <span>내부 코드 <span class="table-required-marker" aria-label="필수">*</span></span>
+                <input class="input" name="internalCode" type="text" placeholder="예: VELDOC-WBS-001" required />
+              </label>
+              <label class="field">
+                <span>버전 <span class="table-required-marker" aria-label="필수">*</span></span>
+                <input class="input" name="version" type="text" placeholder="예: v1.0.0" required />
+              </label>
+              <label class="field">
+                <span>담당자 <span class="table-required-marker" aria-label="필수">*</span></span>
+                <input class="input" name="owner" type="text" placeholder="예: Sean.Kim" required />
+              </label>
+              <label class="field wbs-readonly-date-field">
+                <span>작성일 <span class="wbs-auto-badge">자동</span></span>
+                <input class="input wbs-readonly-date-input" name="createdDate" type="date" readonly tabindex="-1" aria-readonly="true" />
+              </label>
+              <label class="field wbs-readonly-date-field">
+                <span>수정일 <span class="wbs-auto-badge">자동</span></span>
+                <input class="input wbs-readonly-date-input" name="updatedDate" type="date" readonly tabindex="-1" aria-readonly="true" />
+              </label>
+              <label class="field wide">
+                <span>목표</span>
+                <textarea class="input table-textarea" name="goal" placeholder="WBS가 다루는 목표와 범위를 적어주세요."></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div class="panel-title-inline">
+                <h2>작업 목록</h2>
+                <span class="badge" id="wbsTaskCount">0 Tasks</span>
+              </div>
+              <button class="mini-button" id="wbsAddTaskButton" type="button">작업 추가</button>
+            </div>
+            <div class="wbs-task-list" id="wbsTaskRows" aria-label="WBS 작업 카드 목록"></div>
+          </section>
+
+          <section class="panel span-2">
+            <div class="panel-head">
+              <h2>메모</h2>
+            </div>
+            <label class="field">
+              <span>운영 메모</span>
+              <textarea class="input table-textarea" name="memo" placeholder="일정 기준, 산출물 확인 방식, 공유 메모를 적어주세요."></textarea>
+            </label>
+          </section>
+        </form>
+      </section>
+
+      <aside class="preview-panel" id="wbsPreviewPanel" aria-label="Markdown 미리보기" aria-hidden="true" inert>
+        <div class="preview-head">
+          <div>
+            <h2>Markdown</h2>
+            <p>저장될 WBS 문서 미리보기</p>
+          </div>
+          <button class="button secondary" id="wbsCopyButton" type="button">복사</button>
+        </div>
+        <pre id="wbsPreview">새문서를 눌러 WBS 작성을 시작하세요.</pre>
+      </aside>
+    </main>
+    <script src="../assets/js/wbs_editor.js?v=20260508-wbs-file-list-1" defer></script>
+  </body>
+</html>

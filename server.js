@@ -21,12 +21,14 @@ const authPolicyVersion = 2;
 const veldocWorkspaceDirectoryName = 'veldoc';
 const apiEditorDirectoryName = 'api';
 const tableEditorDirectoryName = 'table';
-const homeEditorDirectoryNames = new Set(['wbs', 'srs', 'fsd', apiEditorDirectoryName, tableEditorDirectoryName]);
+const scenarioEditorDirectoryName = 'scenario';
+const homeEditorDirectoryNames = new Set(['wbs', 'srs', 'fsd', apiEditorDirectoryName, tableEditorDirectoryName, scenarioEditorDirectoryName]);
 
 const staticPathAliases = new Map([
   ['/index.html', '/home.html'],
   ['/apieditor.html', '/pages/apieditor.html'],
   ['/tableeditor.html', '/pages/tableeditor.html'],
+  ['/wbseditor.html', '/pages/wbseditor.html'],
 ]);
 
 const mimeTypes = {
