@@ -3735,7 +3735,7 @@ body.wbs-editor-page {
   border-left: 4px solid var(--veldoc-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
-  min-width: 980px;
+  min-width: 1060px;
   padding: 12px;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
@@ -3749,7 +3749,7 @@ body.wbs-editor-page {
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: 88px minmax(190px, 1.4fr) 72px 128px 128px 72px 72px minmax(112px, 0.7fr) 32px;
+  grid-template-columns: 88px minmax(190px, 1.4fr) 72px 128px 128px 72px 82px 72px minmax(112px, 0.7fr) 32px;
 }
 
 .wbs-number-field,
@@ -3789,6 +3789,13 @@ body.wbs-editor-page {
   background: var(--color-bg-secondary);
   color: var(--color-text-secondary);
   cursor: default;
+}
+
+.wbs-task-card.is-auto-schedule .table-cell-input[data-task-key="startDate"],
+.wbs-task-card.is-auto-schedule .table-cell-input[data-task-key="endDate"] {
+  background: var(--veldoc-primary-light);
+  border-color: var(--veldoc-primary-hover);
+  color: var(--veldoc-primary-text);
 }
 
 .wbs-task-card .table-row-remove {
@@ -4652,6 +4659,6 @@ body.wbs-editor-page {
   }
 
   .wbs-task-card {
-    min-width: 980px;
+    min-width: 1060px;
   }
 }

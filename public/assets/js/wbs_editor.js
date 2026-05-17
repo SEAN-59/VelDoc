@@ -70,9 +70,37 @@ const getLocalDateString = (date = new Date()) => {
 };
 
 const DATE_DAY_MS = 24 * 60 * 60 * 1000;
+const KOREAN_SOLAR_HOLIDAYS = new Set(['01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25']);
+const KOREAN_SUBSTITUTE_SOLAR_HOLIDAYS = new Set(['03-01', '05-05', '08-15', '10-03', '10-09', '12-25']);
+const koreanHolidayCache = new Map();
+const createKoreanLunarFormatter = () => {
+  try {
+    return new Intl.DateTimeFormat('ko-KR-u-ca-chinese', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    });
+  } catch {
+    return null;
+  }
+};
+const koreanLunarFormatter = createKoreanLunarFormatter();
 
 const toDateOnly = (date = new Date()) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const addDays = (date, days) => {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+};
+
+const getDateKey = (date) => getLocalDateString(date);
+
+const getMonthDayKey = (date) =>
+  `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
 
 const normalizeDateInput = (value) => {
   const raw = normalizeText(value).replace(/[./]/g, '-');
@@ -123,6 +151,135 @@ const parseDateOnly = (value) => {
   return toDateOnly(parsed);
 };
 
+const getLunarMonthDay = (date) => {
+  try {
+    if (!koreanLunarFormatter) return { month: 0, day: 0 };
+    const parts = koreanLunarFormatter.formatToParts(date);
+    return {
+      month: Number.parseInt(parts.find((part) => part.type === 'month')?.value || '', 10),
+      day: Number.parseInt(parts.find((part) => part.type === 'day')?.value || '', 10),
+    };
+  } catch {
+    return { month: 0, day: 0 };
+  }
+};
+
+const isLunarNewYearEve = (date) => {
+  const nextLunar = getLunarMonthDay(addDays(date, 1));
+  return nextLunar.month === 1 && nextLunar.day === 1;
+};
+
+const isKoreanLunarHoliday = (date) => {
+  const lunar = getLunarMonthDay(date);
+  return isLunarNewYearEve(date)
+    || (lunar.month === 1 && (lunar.day === 1 || lunar.day === 2))
+    || (lunar.month === 4 && lunar.day === 8)
+    || (lunar.month === 8 && lunar.day >= 14 && lunar.day <= 16);
+};
+
+const addSubstituteHoliday = (holidays, date) => {
+  let substitute = addDays(date, 1);
+  while (isWeekend(substitute) || holidays.has(getDateKey(substitute))) {
+    substitute = addDays(substitute, 1);
+  }
+  holidays.add(getDateKey(substitute));
+};
+
+const getKoreanHolidaySet = (year) => {
+  if (koreanHolidayCache.has(year)) return koreanHolidayCache.get(year);
+
+  const holidays = new Set();
+  const substituteCandidates = [];
+  const holidayCounts = new Map();
+  const cursor = new Date(year, 0, 1);
+  while (cursor.getFullYear() === year) {
+    const key = getDateKey(cursor);
+    const monthDayKey = getMonthDayKey(cursor);
+    const isSolarHoliday = KOREAN_SOLAR_HOLIDAYS.has(monthDayKey);
+    const isLunarHoliday = isKoreanLunarHoliday(cursor);
+
+    if (isSolarHoliday || isLunarHoliday) {
+      holidays.add(key);
+      holidayCounts.set(key, (holidayCounts.get(key) || 0) + 1);
+    }
+    if ((isSolarHoliday && KOREAN_SUBSTITUTE_SOLAR_HOLIDAYS.has(monthDayKey)) || isLunarHoliday) {
+      substituteCandidates.push(new Date(cursor));
+    }
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  substituteCandidates.forEach((date) => {
+    const key = getDateKey(date);
+    if (isWeekend(date) || (holidayCounts.get(key) || 0) > 1) {
+      addSubstituteHoliday(holidays, date);
+    }
+  });
+
+  koreanHolidayCache.set(year, holidays);
+  return holidays;
+};
+
+const isKoreanPublicHoliday = (date) => getKoreanHolidaySet(date.getFullYear()).has(getDateKey(date));
+
+const countBusinessDaysInclusive = (start, end) => {
+  if (!start || !end || end < start) return 0;
+  let count = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (!isWeekend(cursor) && !isKoreanPublicHoliday(cursor)) count += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+};
+
+const getTaskNormalizedWbs = (task) => {
+  const normalized = normalizeWbsNumber(task?.wbsNumber);
+  return /^\d+(?:\.\d+)*$/.test(normalized) ? normalized : '';
+};
+
+const getParentWbs = (wbsNumber) => wbsNumber.includes('.')
+  ? wbsNumber.slice(0, wbsNumber.lastIndexOf('.'))
+  : '';
+
+const applyTaskSchedules = (tasks = []) => {
+  const taskMeta = tasks.map((task) => ({
+    task,
+    wbsNumber: getTaskNormalizedWbs(task),
+  }));
+  const directChildren = new Map();
+
+  taskMeta.forEach((meta) => {
+    if (!meta.wbsNumber) return;
+    const parentWbs = getParentWbs(meta.wbsNumber);
+    if (!parentWbs) return;
+    if (!directChildren.has(parentWbs)) directChildren.set(parentWbs, []);
+    directChildren.get(parentWbs).push(meta.task);
+  });
+
+  taskMeta
+    .slice()
+    .sort((left, right) => getWbsSegments(right.wbsNumber).length - getWbsSegments(left.wbsNumber).length)
+    .forEach((meta) => {
+      const children = directChildren.get(meta.wbsNumber) || [];
+      meta.task.isScheduleAuto = children.length > 0;
+      if (children.length === 0) {
+        updateTaskSchedule(meta.task);
+        return;
+      }
+
+      const starts = children.map((child) => parseDateOnly(child.startDate)).filter(Boolean);
+      const ends = children.map((child) => parseDateOnly(child.endDate)).filter(Boolean);
+      meta.task.startDate = starts.length > 0
+        ? getLocalDateString(new Date(Math.min(...starts.map((date) => date.getTime()))))
+        : '';
+      meta.task.endDate = ends.length > 0
+        ? getLocalDateString(new Date(Math.max(...ends.map((date) => date.getTime()))))
+        : '';
+      updateTaskSchedule(meta.task);
+    });
+};
+
 const updateTaskSchedule = (task) => {
   const start = parseDateOnly(task.startDate);
   let end = parseDateOnly(task.endDate);
@@ -134,21 +291,30 @@ const updateTaskSchedule = (task) => {
 
   if (!start || !end) {
     task.duration = '';
+    task.businessDuration = '';
     task.progress = '';
     return;
   }
 
   const durationDays = Math.floor((end - start) / DATE_DAY_MS) + 1;
+  const businessDays = countBusinessDaysInclusive(start, end);
   const today = toDateOnly();
   task.duration = `${durationDays}일`;
+  task.businessDuration = `${businessDays}일`;
 
   if (today < start) {
     task.progress = '-';
     return;
   }
 
-  const elapsedDays = Math.min(Math.floor((today - start) / DATE_DAY_MS) + 1, durationDays);
-  task.progress = `${Math.round((elapsedDays / durationDays) * 100)}%`;
+  if (businessDays === 0) {
+    task.progress = today > end ? '100%' : '0%';
+    return;
+  }
+
+  const clampedToday = today > end ? end : today;
+  const elapsedBusinessDays = countBusinessDaysInclusive(start, clampedToday);
+  task.progress = `${Math.round((elapsedBusinessDays / businessDays) * 100)}%`;
 };
 
 const openDatePicker = (input) => {
@@ -181,6 +347,7 @@ const createTask = (values = {}) => ({
   startDate: values.startDate || '',
   endDate: values.endDate || '',
   duration: values.duration || '',
+  businessDuration: values.businessDuration || '',
   progress: values.progress || '',
 });
 
@@ -483,7 +650,7 @@ const writeFormValues = () => {
 
 const getMeaningfulTasks = () =>
   (state.data?.tasks || []).filter((task) =>
-    ['wbsNumber', 'taskName', 'owner', 'startDate', 'endDate', 'duration', 'progress', 'deliverable']
+    ['wbsNumber', 'taskName', 'owner', 'startDate', 'endDate', 'duration', 'businessDuration', 'progress', 'deliverable']
       .some((key) => normalizeText(task[key])),
   );
 
@@ -537,7 +704,7 @@ const sortStateTasksByWbsNumber = () => {
 const createMarkdown = () => {
   if (!state.data) return '';
   readFormValues();
-  state.data.tasks.forEach(updateTaskSchedule);
+  applyTaskSchedules(state.data.tasks);
   const { basic } = state.data;
   const title = basic.projectName || 'WBS';
   const taskRows = getTasksInWbsOrder(getMeaningfulTasks()).map((task) => [
@@ -547,6 +714,7 @@ const createMarkdown = () => {
     task.startDate,
     task.endDate,
     task.duration,
+    task.businessDuration,
     task.progress,
     task.deliverable,
   ]);
@@ -571,7 +739,7 @@ ${buildMarkdownTable(
 ## 2. 작업 목록
 
 ${buildMarkdownTable(
-    ['WBS', '작업', '담당자', '시작일', '종료일', '기간', '진행률', '산출물'],
+    ['WBS', '작업', '담당자', '시작일', '종료일', '기간', '영업 기간', '진행률', '산출물'],
     taskRows,
   )}
 
@@ -647,6 +815,7 @@ const parseMarkdown = (markdown) => {
   const taskTable = parseMarkdownTable(getMarkdownSection(markdown, '작업 목록'));
   data.tasks = taskTable.rows.map((cells) => {
     const isCurrentFormat = taskTable.headers[0] === 'WBS';
+    const hasBusinessDuration = taskTable.headers.includes('영업 기간');
     const isTreeFormat = taskTable.headers[0] === '구조';
     return createTask(isCurrentFormat
       ? {
@@ -656,8 +825,9 @@ const parseMarkdown = (markdown) => {
           startDate: cells[3],
           endDate: cells[4],
           duration: cells[5],
-          progress: cells[6],
-          deliverable: cells[7],
+          businessDuration: hasBusinessDuration ? cells[6] : '',
+          progress: hasBusinessDuration ? cells[7] : cells[6],
+          deliverable: hasBusinessDuration ? cells[8] : cells[7],
         }
       : isTreeFormat
         ? {
@@ -743,13 +913,46 @@ const addTaskAndFocus = () => {
   dom.taskRows?.lastElementChild?.querySelector('input')?.focus();
 };
 
+const scrollTaskControlIntoView = (control) => {
+  if (!dom.taskRows || !control) return;
+  const controlRect = control.getBoundingClientRect();
+  const scrollerRect = dom.taskRows.getBoundingClientRect();
+  const gutter = 18;
+  if (controlRect.right > scrollerRect.right - gutter) {
+    dom.taskRows.scrollBy({
+      left: controlRect.right - scrollerRect.right + gutter,
+      behavior: 'smooth',
+    });
+    return;
+  }
+  if (controlRect.left < scrollerRect.left + gutter) {
+    dom.taskRows.scrollBy({
+      left: controlRect.left - scrollerRect.left - gutter,
+      behavior: 'smooth',
+    });
+  }
+};
+
+const updateRenderedScheduleFields = () => {
+  if (!dom.taskRows || !state.data) return;
+  const scheduleKeys = ['startDate', 'endDate', 'duration', 'businessDuration', 'progress'];
+  state.data.tasks.forEach((task, index) => {
+    scheduleKeys.forEach((key) => {
+      const input = dom.taskRows.querySelector(`[data-task-index="${index}"][data-task-key="${key}"]`);
+      if (!input) return;
+      input.value = task[key] || '';
+      if (key === 'endDate') input.min = task.startDate || '';
+    });
+  });
+};
+
 const renderTasks = () => {
   if (!dom.taskRows || !state.data) return;
   sortStateTasksByWbsNumber();
+  applyTaskSchedules(state.data.tasks);
   dom.taskRows.replaceChildren();
 
   state.data.tasks.forEach((task, index) => {
-    updateTaskSchedule(task);
     const taskItem = document.createElement('div');
     taskItem.className = 'wbs-task-item';
     taskItem.dataset.taskIndex = String(index);
@@ -757,20 +960,24 @@ const renderTasks = () => {
 
     const card = document.createElement('article');
     card.className = 'wbs-task-card';
+    card.classList.toggle('is-auto-schedule', Boolean(task.isScheduleAuto));
     let startDateInput = null;
     let endDateInput = null;
     let durationInput = null;
+    let businessDurationInput = null;
     let progressInput = null;
 
     const syncScheduleFields = () => {
-      updateTaskSchedule(task);
+      applyTaskSchedules(state.data.tasks);
       if (startDateInput) startDateInput.value = task.startDate || '';
       if (endDateInput) {
         endDateInput.value = task.endDate || '';
         endDateInput.min = task.startDate || '';
       }
       if (durationInput) durationInput.value = task.duration || '';
+      if (businessDurationInput) businessDurationInput.value = task.businessDuration || '';
       if (progressInput) progressInput.value = task.progress || '';
+      updateRenderedScheduleFields();
       updatePreview();
     };
 
@@ -781,7 +988,8 @@ const renderTasks = () => {
       input.dataset.taskKey = key;
       input.type = type;
       input.value = task[key] || '';
-      if (key === 'duration' || key === 'progress') {
+      const isAutoScheduleDateField = task.isScheduleAuto && (key === 'startDate' || key === 'endDate');
+      if (key === 'duration' || key === 'businessDuration' || key === 'progress' || isAutoScheduleDateField) {
         input.readOnly = true;
         input.tabIndex = -1;
         input.setAttribute('aria-readonly', 'true');
@@ -791,14 +999,18 @@ const renderTasks = () => {
         input.inputMode = 'decimal';
       }
       if (key === 'startDate' || key === 'endDate') {
-        input.placeholder = 'YYMMDD';
-        input.title = '달력으로 선택하거나 YYMMDD로 입력하세요.';
+        input.placeholder = isAutoScheduleDateField ? '자동' : 'YYMMDD';
+        input.title = isAutoScheduleDateField
+          ? '하위 작업 일정 기준으로 자동 계산됩니다.'
+          : '달력으로 선택하거나 YYMMDD로 입력하세요.';
         if (key === 'endDate') input.min = task.startDate || '';
-        input.addEventListener('focus', () => openDatePicker(input));
-        input.addEventListener('click', () => openDatePicker(input));
+        if (!isAutoScheduleDateField) {
+          input.addEventListener('focus', () => openDatePicker(input));
+          input.addEventListener('click', () => openDatePicker(input));
+        }
       }
       input.addEventListener('input', () => {
-        if (key === 'duration' || key === 'progress') return;
+        if (input.readOnly || key === 'duration' || key === 'businessDuration' || key === 'progress') return;
         task[key] = input.value;
         if (key === 'wbsNumber') {
           refreshTaskIndentation();
@@ -808,6 +1020,7 @@ const renderTasks = () => {
         }
         updatePreview();
       });
+      input.addEventListener('focus', () => scrollTaskControlIntoView(input));
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -895,6 +1108,7 @@ const renderTasks = () => {
     startDateInput = createInput('startDate', 'date');
     endDateInput = createInput('endDate', 'date');
     durationInput = createInput('duration');
+    businessDurationInput = createInput('businessDuration');
     progressInput = createInput('progress');
     syncScheduleFields();
 
@@ -905,6 +1119,7 @@ const renderTasks = () => {
       createLabeledField('시작일', startDateInput),
       createLabeledField('종료일', endDateInput),
       createLabeledField('기간', durationInput),
+      createLabeledField('영업 기간', businessDurationInput),
       createLabeledField('진행률', progressInput),
       createLabeledField('산출물', createInput('deliverable')),
       removeButton,

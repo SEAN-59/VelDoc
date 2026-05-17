@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>WBS-VelDoc</title>
     <link rel="icon" type="image/png" href="../assets/images/favicon.ico?v=20260430-1" sizes="32x32" />
-    <link rel="stylesheet" href="../assets/css/styles.css?v=20260508-wbs-file-list-1" />
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260517-wbs-working-days-1" />
   </head>
   <body class="wbs-editor-page">
     <div class="toast-container" id="wbsToastContainer" aria-live="polite" aria-atomic="false"></div>
@@ -84,8 +84,10 @@
               <dl class="help-file-list">
                 <div><dt>작성일</dt><dd>새 문서를 만들 때 자동으로 들어갑니다.</dd></div>
                 <div><dt>수정일</dt><dd>저장할 때마다 저장 날짜로 자동 변경됩니다.</dd></div>
-                <div><dt>기간</dt><dd>시작일과 종료일을 포함해 자동 계산합니다.</dd></div>
-                <div><dt>진행률</dt><dd>오늘 날짜 기준으로 자동 계산하고 100%를 넘기지 않습니다.</dd></div>
+                <div><dt>기간</dt><dd>시작일과 종료일을 포함한 전체 일수입니다.</dd></div>
+                <div><dt>영업 기간</dt><dd>주말과 한국 주요 공휴일을 제외한 기준 일수입니다.</dd></div>
+                <div><dt>진행률</dt><dd>영업 기간 기준으로 자동 계산하고 100%를 넘기지 않습니다.</dd></div>
+                <div><dt>상위 작업</dt><dd>하위 작업이 있으면 시작일과 종료일을 하위 일정 기준으로 자동 계산합니다.</dd></div>
               </dl>
             </section>
           </div>
@@ -222,6 +224,6 @@
         <pre id="wbsPreview">새문서를 눌러 WBS 작성을 시작하세요.</pre>
       </aside>
     </main>
-    <script src="../assets/js/wbs_editor.js?v=20260508-wbs-file-list-1" defer></script>
+    <script src="../assets/js/wbs_editor.js?v=20260517-wbs-working-days-1" defer></script>
   </body>
 </html>
